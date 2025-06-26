@@ -13,7 +13,7 @@ class WorkingPty extends EventEmitter {
   constructor(options = {}) {
     super();
     this.shell = options.shell || process.env.SHELL || '/bin/bash';
-    this.cwd = options.cwd || process.env.HOME || os.homedir();
+    this.cwd = os.homedir(); // Always start in home directory
     this.env = options.env || process.env;
     this.cols = options.cols || 80;
     this.rows = options.rows || 30;
@@ -97,47 +97,53 @@ def main():
         # Execute shell with proper terminal settings
         # For zsh/bash, use login shell to load RC files
         if 'zsh' in shell or 'bash' in shell:
+            # Set ZDOTDIR to load our custom config for zsh
+            if 'zsh' in shell:
+                os.environ['ZDOTDIR'] = os.environ.get('HOME', '') + '/develop/Zeami-1/projects/zeami-term'
             os.execvp(shell, [shell, '-l', '-i'])
         else:
             os.execvp(shell, [shell, '-i'])
     else:  # Parent
         os.close(slave_fd)
         
-        # Set proper terminal attributes for the master PTY
-        try:
-            attrs = termios.tcgetattr(master_fd)
-            # Keep most settings but ensure proper echo behavior
-            attrs[3] = attrs[3] | termios.ECHO | termios.ICANON
-            termios.tcsetattr(master_fd, termios.TCSANOW, attrs)
-        except:
-            pass
+        # Note: Master PTY attributes are usually handled by the slave side
+        # We don't need to set attributes on the master FD
+        # The shell process will handle echo and other terminal settings
         
         # Set raw mode for stdin only if it's a terminal
         old_tty = None
         if os.isatty(sys.stdin.fileno()):
             try:
                 old_tty = termios.tcgetattr(sys.stdin)
-                tty.setraw(sys.stdin.fileno())
+                # Don't use tty.setraw as it disables too many features
+                # Instead, configure terminal minimally
+                new_tty = termios.tcgetattr(sys.stdin)
+                # Disable canonical mode and echo
+                new_tty[3] = new_tty[3] & ~termios.ICANON & ~termios.ECHO
+                # Set VMIN and VTIME for immediate input
+                new_tty[6][termios.VMIN] = 1
+                new_tty[6][termios.VTIME] = 0
+                termios.tcsetattr(sys.stdin, termios.TCSANOW, new_tty)
             except:
                 pass
         
         try:
-            # Make both stdin and master non-blocking
-            fcntl.fcntl(sys.stdin, fcntl.F_SETFL, os.O_NONBLOCK)
+            # Make master non-blocking
             fcntl.fcntl(master_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+            # Keep stdin blocking for proper input handling
             
             input_buffer = b''
             
             while True:
                 try:
-                    # Wait for data with smaller timeout for responsiveness
-                    rfds, _, _ = select.select([sys.stdin, master_fd], [], [], 0.001)
+                    # Wait for data with small timeout for responsiveness
+                    rfds, _, _ = select.select([sys.stdin, master_fd], [], [], 0.01)
                     
                     # Read from stdin and write to PTY
                     if sys.stdin in rfds:
                         try:
-                            # Read just one byte at a time for immediate response
-                            data = os.read(sys.stdin.fileno(), 1)
+                            # Read available data (up to 1024 bytes)
+                            data = os.read(sys.stdin.fileno(), 1024)
                             if data:
                                 # Write immediately to PTY
                                 os.write(master_fd, data)
@@ -230,6 +236,13 @@ if __name__ == '__main__':
     }
     
     try {
+      // Debug log for received data
+      console.log('[WorkingPty] Received input:', data.split('').map(c => {
+        const code = c.charCodeAt(0);
+        if (code < 32 || code === 127) return `\\x${code.toString(16).padStart(2, '0')}`;
+        return c;
+      }).join(''));
+      
       // Write data to Python script's stdin
       this.process.stdin.write(data);
     } catch (error) {

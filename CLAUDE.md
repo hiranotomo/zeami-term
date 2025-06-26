@@ -93,20 +93,35 @@ npm run lint
 
 ## 開発フェーズ
 
-### Phase 1: 基本ターミナル (現在)
-- [ ] Electron + xterm.js + node-ptyの統合
-- [ ] Claude Codeプロセスの起動
-- [ ] 基本的な入出力
+### Phase 1: 基本ターミナル (✅ 完了)
+- [x] Electron + xterm.js + node-ptyの統合
+- [x] Claude Codeプロセスの起動
+- [x] 基本的な入出力
+- [x] スプリットビュー機能
+- [x] カラーリング・パフォーマンス最適化
 
-### Phase 2: メッセージルーティング
+### Phase 2: メッセージルーティング (開発中)
 - [ ] MessageRouterの実装
 - [ ] パターン検知機能
 - [ ] メッセージ補強機能
 
-### Phase 3: Zeami統合
+### Phase 3: Zeami統合 (計画中)
 - [ ] Zeami CLIとの連携
 - [ ] ドキュメント参照機能
 - [ ] 学習機能の統合
+
+## 主要な改善内容
+
+詳細な改善履歴は [ZEAMITERM_COMPREHENSIVE_IMPROVEMENTS.md](docs/ZEAMITERM_COMPREHENSIVE_IMPROVEMENTS.md) を参照してください。
+
+### 実装済み機能
+- ✅ 入力遅延問題の完全解決
+- ✅ スプリットビューでのターミナル管理
+- ✅ Claude Code完全統合
+- ✅ プロジェクトコンテキスト自動認識
+- ✅ VS Code風カラーテーマ
+- ✅ WebGLによる高速レンダリング
+- ✅ 無限ループ問題の修正
 
 ## データフロー
 
@@ -148,4 +163,5 @@ npm run lint
 
 ## 更新履歴
 
-- 2025-06-25: プロジェクト初期化、基本構造の定義
+- 2025-06-26: 包括的改善記録の作成、無限ループ問題の修正、パフォーマンス最適化
+- 2025-06-25: プロジェクト初期化、基本構造の定義、基本機能の実装完了

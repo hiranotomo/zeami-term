@@ -1,0 +1,9 @@
+#!/usr/bin/env zsh
+
+# Simple help command that shows ZeamiTerm menu
+
+# Get script directory
+SCRIPT_DIR="${0:A:h}"
+
+# Show the menu
+exec "$SCRIPT_DIR/zeami-menu.zsh"

@@ -42,6 +42,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onSessionSaveRequest: (callback) => {
     ipcRenderer.on('session:request-save', (event) => callback());
+  },
+  
+  // Auto update events
+  onUpdateStatus: (callback) => {
+    ipcRenderer.on('update-status', (event, data) => callback(data.event, data.data));
   }
 });
 

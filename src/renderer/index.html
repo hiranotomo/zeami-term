@@ -131,10 +131,23 @@
       right: 0;
       bottom: 0;
       display: none;
+      width: 100%;
+      height: 100%;
     }
     
     .terminal-wrapper.active {
       display: block;
+    }
+    
+    /* Ensure xterm takes full space */
+    .terminal-wrapper .xterm {
+      height: 100%;
+      width: 100%;
+    }
+    
+    .terminal-wrapper .xterm-screen {
+      height: 100%;
+      width: 100%;
     }
     
     .status-bar {
@@ -449,6 +462,8 @@
   
   <!-- Load split manager and terminal manager -->
   <script src="splitManager.js"></script>
+  <script src="startup-animation.js"></script>
+  <script src="updateNotifier.js"></script>
   <script src="terminalManager.js"></script>
 </body>
 </html>

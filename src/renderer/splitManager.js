@@ -92,23 +92,41 @@ class SplitManager {
     
     // Move terminals to panes
     if (terminalWrappers[0]) {
-      const { wrapper } = terminalWrappers[0];
+      const { id, wrapper } = terminalWrappers[0];
       this.pane1.appendChild(wrapper);
       wrapper.classList.add('active');
       // Ensure wrapper fills the pane
       wrapper.style.width = '100%';
       wrapper.style.height = '100%';
       wrapper.style.position = 'relative';
+      
+      // Add click handler for focus
+      wrapper.addEventListener('click', () => {
+        this.terminalManager.switchToTerminal(id);
+        const session = this.terminalManager.terminals.get(id);
+        if (session && session.terminal) {
+          session.terminal.focus();
+        }
+      });
     }
     
     if (terminalWrappers[1]) {
-      const { wrapper } = terminalWrappers[1];
+      const { id, wrapper } = terminalWrappers[1];
       this.pane2.appendChild(wrapper);
       wrapper.classList.add('active');
       // Ensure wrapper fills the pane
       wrapper.style.width = '100%';
       wrapper.style.height = '100%';
       wrapper.style.position = 'relative';
+      
+      // Add click handler for focus
+      wrapper.addEventListener('click', () => {
+        this.terminalManager.switchToTerminal(id);
+        const session = this.terminalManager.terminals.get(id);
+        if (session && session.terminal) {
+          session.terminal.focus();
+        }
+      });
     }
     
     // Setup resize
@@ -119,6 +137,18 @@ class SplitManager {
     
     // Resize terminals
     this.resizeTerminals();
+    
+    // Focus first terminal
+    if (terminalWrappers[0]) {
+      const { id } = terminalWrappers[0];
+      this.terminalManager.switchToTerminal(id);
+      setTimeout(() => {
+        const session = this.terminalManager.terminals.get(id);
+        if (session && session.terminal) {
+          session.terminal.focus();
+        }
+      }, 100);
+    }
   }
   
   removeSplitLayout() {

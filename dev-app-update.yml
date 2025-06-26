@@ -1,0 +1,6 @@
+# Development auto-update configuration
+# This file is used for testing auto-update locally
+
+provider: generic
+url: http://localhost:8080/releases/
+updaterCacheDirName: zeami-term-updater-dev

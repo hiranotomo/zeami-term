@@ -15,8 +15,12 @@ class TerminalManager {
     
     // Performance optimization settings
     this.useWebGL = true;
-    this.scrollbackLimit = 10000;
+    this.scrollbackLimit = 50000; // Increased for large outputs
     this.fastScrollModifier = 'shift';
+    this.fastScrollMultiplier = 10; // 10x speed with shift
+    
+    // Show startup logo
+    this.showStartupLogo = true;
     
     // xterm.js configuration with performance optimizations
     this.defaultOptions = {
@@ -28,6 +32,10 @@ class TerminalManager {
       lineHeight: 1.2,
       letterSpacing: 0,
       scrollback: this.scrollbackLimit,
+      smoothScrollDuration: 0, // Disable smooth scrolling for performance
+      fastScrollModifier: 'shift',
+      fastScrollSensitivity: 5,
+      scrollSensitivity: 1,
       theme: {
         foreground: '#cccccc',
         background: '#1e1e1e',
@@ -89,14 +97,19 @@ class TerminalManager {
       this.splitManager = new window.SplitManager(this);
     }
     
+    // Initialize update notifier
+    if (window.UpdateNotifier) {
+      this.updateNotifier = new window.UpdateNotifier();
+    }
+    
     // Setup search UI
     this.setupSearchUI();
     
     // Setup event listeners
     this.setupEventListeners();
     
-    // Setup session management
-    this.setupSessionManagement();
+    // Setup session management - DISABLED for now
+    // this.setupSessionManagement();
     
     // Create initial terminal
     const firstSession = await this.createTerminal();
@@ -106,8 +119,13 @@ class TerminalManager {
       setTimeout(() => {
         this.switchToTerminal(firstSession.id);
         this.focusActiveTerminal();
+        // Force resize to fix initial display area
+        this.resizeAllTerminals();
         // Additional focus attempt after a longer delay
-        setTimeout(() => this.focusActiveTerminal(), 500);
+        setTimeout(() => {
+          this.focusActiveTerminal();
+          this.resizeAllTerminals();
+        }, 500);
       }, 100);
     }
   }
@@ -320,8 +338,14 @@ class TerminalManager {
     // Open terminal in wrapper
     terminal.open(wrapper);
     
-    // Fit terminal to container
-    fitAddon.fit();
+    // Fit terminal to container with a delay to ensure proper sizing
+    setTimeout(() => {
+      fitAddon.fit();
+      // Force a second fit after a short delay for accuracy
+      setTimeout(() => {
+        fitAddon.fit();
+      }, 100);
+    }, 50);
     
     // Create terminal session
     const session = {
@@ -346,6 +370,9 @@ class TerminalManager {
     
     // Setup terminal handlers
     this.setupTerminalHandlers(session);
+    
+    // Switch to this terminal immediately
+    this.switchToTerminal(id);
     
     // Connect to backend
     await this.connectTerminal(session);
@@ -410,6 +437,13 @@ class TerminalManager {
       if (session.process) {
         const api = window.electronAPI || window.zeamiAPI;
         if (api) {
+          // Debug log for input
+          console.log('[Terminal] Sending input:', data.split('').map(c => {
+            const code = c.charCodeAt(0);
+            if (code < 32 || code === 127) return `\\x${code.toString(16).padStart(2, '0')}`;
+            return c;
+          }).join(''));
+          
           // Send all data immediately to ensure proper echo and display
           if (window.electronAPI) {
             window.electronAPI.sendInput(session.process.sessionId || session.process.id, data);
@@ -474,58 +508,60 @@ class TerminalManager {
     terminal.element.addEventListener('focus', () => {
       this.activeTerminalId = session.id;
       this.updateStatusBar(session);
+      
+      // Update tab state when terminal is focused
+      const tab = document.getElementById(`tab-${session.id}`);
+      const prevTab = document.getElementById(`tab-${this.activeTerminalId}`);
+      if (prevTab && prevTab !== tab) prevTab.classList.remove('active');
+      if (tab) tab.classList.add('active');
     });
     
-    // Handle scrolling performance
-    let scrollTimer;
-    let isScrolling = false;
+    // Add click handler to wrapper for better focus handling in split mode
+    const wrapper = document.getElementById(`wrapper-${session.id}`);
+    if (wrapper) {
+      wrapper.addEventListener('click', () => {
+        if (this.splitManager && this.splitManager.isActive) {
+          session.terminal.focus();
+        }
+      });
+    }
     
-    // Passive event listener for better scroll performance
+    // Optimized scrolling with WebGL performance improvements
+    let scrollTimer = null;
+    let rafId = null;
+    
+    // Use passive listener for better performance
     terminal.element.addEventListener('wheel', (e) => {
-      // Calculate scroll lines based on delta
-      const deltaMode = e.deltaMode;
-      let scrollLines = 0;
-      
-      // Normalize scroll delta across different input devices
-      if (deltaMode === 0) { // DOM_DELTA_PIXEL
-        scrollLines = Math.ceil(Math.abs(e.deltaY) / 40);
-      } else if (deltaMode === 1) { // DOM_DELTA_LINE
-        scrollLines = Math.abs(e.deltaY);
-      } else { // DOM_DELTA_PAGE
-        scrollLines = Math.abs(e.deltaY) * terminal.rows;
-      }
-      
-      // Apply fast scroll multiplier
-      if (e.shiftKey || e[this.fastScrollModifier + 'Key']) {
-        scrollLines *= 5;
-      }
-      
-      // Limit scroll speed to prevent jumps
-      scrollLines = Math.min(scrollLines, 50);
-      
-      // Perform scroll
-      terminal.scrollLines(e.deltaY > 0 ? scrollLines : -scrollLines);
-      
-      // Prevent default to avoid double scrolling
       e.preventDefault();
       
-      // Optimize rendering during scroll
-      if (!isScrolling) {
-        isScrolling = true;
-        // Temporarily reduce render quality during scroll
-        if (session.rendererAddon && session.rendererAddon.setDimensions) {
-          terminal.options.scrollback = Math.min(terminal.options.scrollback, 5000);
-        }
+      // Calculate normalized scroll delta
+      let deltaY = e.deltaY;
+      if (e.deltaMode === 1) { // DOM_DELTA_LINE
+        deltaY *= 40; // Convert to pixels
+      } else if (e.deltaMode === 2) { // DOM_DELTA_PAGE
+        deltaY *= terminal.rows * 40;
       }
       
+      // Apply scroll multiplier for shift key (10x speed)
+      const multiplier = e.shiftKey ? 10 : 1;
+      const scrollLines = Math.sign(deltaY) * Math.max(1, Math.ceil(Math.abs(deltaY) / 40)) * multiplier;
+      
+      // Cancel any pending scroll animation
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      
+      // Use requestAnimationFrame for smooth scrolling
+      rafId = requestAnimationFrame(() => {
+        terminal.scrollLines(scrollLines);
+        rafId = null;
+      });
+      
+      // Clear texture atlas for WebGL optimization
       clearTimeout(scrollTimer);
       scrollTimer = setTimeout(() => {
-        isScrolling = false;
-        // Restore render quality after scroll
-        if (session.rendererAddon) {
-          terminal.options.scrollback = this.scrollbackLimit;
-          // Force re-render with full quality
-          session.fitAddon.fit();
+        if (session.rendererAddon && session.rendererAddon.clearTextureAtlas) {
+          session.rendererAddon.clearTextureAtlas();
         }
       }, 150);
     }, { passive: false });
@@ -541,18 +577,32 @@ class TerminalManager {
     }
     
     try {
-      session.terminal.write('\x1b[36mConnecting to terminal backend...\x1b[0m\r\n');
+      // First ensure the terminal is visible and focused
+      const wrapper = document.getElementById(`wrapper-${session.id}`);
+      if (wrapper) {
+        wrapper.classList.add('active');
+      }
+      
+      // Display cool startup logo (only on first terminal or if enabled)
+      if (this.showStartupLogo && this.terminalCounter === 1) {
+        // Ensure terminal is ready and visible
+        await new Promise(resolve => setTimeout(resolve, 200));
+        session.terminal.focus();
+        await this.displayStartupLogo(session.terminal);
+      } else {
+        session.terminal.write('\x1b[36mConnecting to terminal backend...\x1b[0m\r\n');
+      }
       
       const result = window.electronAPI 
         ? await window.electronAPI.createTerminal({
             cols: session.terminal.cols,
             rows: session.terminal.rows,
-            cwd: session.cwd || '/'
+            cwd: null // Let backend use home directory
           })
         : await window.zeamiAPI.startSession({
             cols: session.terminal.cols,
             rows: session.terminal.rows,
-            cwd: session.cwd
+            cwd: null // Let backend use home directory
           });
       
       if (result.success || result.id) {
@@ -571,7 +621,7 @@ class TerminalManager {
         // Send terminal configuration commands as a single command to avoid multiple prompts
         setTimeout(() => {
           // Combine all exports into one command with ; separator
-          const configCommand = 'export TERM=xterm-256color LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 2>/dev/null; clear';
+          const configCommand = 'export TERM=xterm-256color LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 2>/dev/null';
           
           const api = window.electronAPI || window.zeamiAPI;
           if (window.electronAPI) {
@@ -731,7 +781,7 @@ class TerminalManager {
       // Update status bar
       this.updateStatusBar(session);
     } else {
-      // Split mode - handled by split manager
+      // Split mode - update active terminal and focus
       const tab = document.getElementById(`tab-${id}`);
       const prevTab = document.getElementById(`tab-${this.activeTerminalId}`);
       
@@ -740,8 +790,16 @@ class TerminalManager {
       
       this.activeTerminalId = id;
       
-      // Update status bar
+      // Focus the selected terminal in split mode
       const session = this.terminals.get(id);
+      if (session && session.terminal) {
+        // Add a small delay to ensure the terminal is properly rendered
+        setTimeout(() => {
+          session.terminal.focus();
+        }, 10);
+      }
+      
+      // Update status bar
       this.updateStatusBar(session);
     }
   }
@@ -830,9 +888,43 @@ class TerminalManager {
   resizeAllTerminals() {
     this.terminals.forEach(session => {
       if (session.fitAddon) {
-        session.fitAddon.fit();
+        try {
+          // Force recalculation of dimensions
+          const wrapper = document.getElementById(`wrapper-${session.id}`);
+          if (wrapper) {
+            // Ensure wrapper has proper dimensions
+            const containerRect = document.getElementById('terminal-container').getBoundingClientRect();
+            wrapper.style.width = '100%';
+            wrapper.style.height = '100%';
+          }
+          
+          // Fit multiple times to ensure accuracy
+          session.fitAddon.fit();
+          
+          // Send resize to backend
+          if (session.process && session.terminal) {
+            const { cols, rows } = session.terminal;
+            this.resizeProcess(session.id, cols, rows);
+          }
+        } catch (error) {
+          console.error('Error resizing terminal:', error);
+        }
       }
     });
+  }
+  
+  resizeProcess(id, cols, rows) {
+    const session = this.terminals.get(id);
+    if (!session || !session.process) return;
+    
+    const api = window.electronAPI || window.zeamiAPI;
+    if (api) {
+      if (window.electronAPI) {
+        window.electronAPI.resizeTerminal(session.process.sessionId || session.process.id, cols, rows);
+      } else {
+        window.zeamiAPI.resizeTerminal(session.process.sessionId, cols, rows);
+      }
+    }
   }
   
   updateStatusBar(session) {
@@ -842,6 +934,102 @@ class TerminalManager {
       `Directory: ${session.cwd || '-'}`;
     document.getElementById('status-process').textContent = 
       `Process: ${session.process ? session.process.pid : '-'}`;
+  }
+  
+  async displayStartupLogo(terminal) {
+    // Wait a bit to ensure terminal is fully initialized
+    await this.sleep(100);
+    
+    // Clear screen
+    terminal.write('\x1b[2J\x1b[H');
+    
+    // Colors
+    const GREEN = '\x1b[1;32m';
+    const DIM_GREEN = '\x1b[2;32m';
+    const RESET = '\x1b[0m';
+    const CYAN = '\x1b[36m';
+    const BRIGHT_CYAN = '\x1b[1;36m';
+    
+    // Skip matrix rain for now - just show logo
+    // await this.matrixRainEffect(terminal, 3);
+    
+    // Clear screen for logo
+    terminal.write('\x1b[2J\x1b[H');
+    
+    // ASCII Art logo with typewriter effect
+    const logo = [
+      '██████╗ ███████╗ █████╗ ███╗   ███╗██╗    ████████╗███████╗██████╗ ███╗   ███╗',
+      '╚══███╔╝██╔════╝██╔══██╗████╗ ████║██║    ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║',
+      '  ███╔╝ █████╗  ███████║██╔████╔██║██║       ██║   █████╗  ██████╔╝██╔████╔██║',
+      ' ███╔╝  ██╔══╝  ██╔══██║██║╚██╔╝██║██║       ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║',
+      '███████╗███████╗██║  ██║██║ ╚═╝ ██║██║       ██║   ███████╗██║  ██║██║ ╚═╝ ██║',
+      '╚══════╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝       ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝'
+    ];
+    
+    // Display logo with animation
+    terminal.write(GREEN);
+    for (const line of logo) {
+      terminal.write(line + '\r\n');
+      await this.sleep(50);
+    }
+    terminal.write(RESET + '\r\n');
+    
+    // Version and tagline
+    const tagline = 'Terminal from Teleport v0.1.0';
+    const padding = ' '.repeat(Math.floor((80 - tagline.length) / 2));
+    terminal.write(padding + BRIGHT_CYAN + tagline + RESET + '\r\n');
+    terminal.write(padding + DIM_GREEN + 'Advanced Terminal Emulator for Claude Code' + RESET + '\r\n\r\n');
+    
+    // System initialization messages with animation
+    const messages = [
+      { delay: 100, text: '[SYSTEM] Initializing quantum encryption matrix...', color: DIM_GREEN },
+      { delay: 150, text: '[SYSTEM] Loading neural interface drivers...', color: DIM_GREEN },
+      { delay: 200, text: '[SYSTEM] Establishing secure channel...', color: DIM_GREEN },
+      { delay: 100, text: '[OK] Encryption: AES-256-GCM', color: GREEN },
+      { delay: 100, text: '[OK] Authentication: ED25519', color: GREEN },
+      { delay: 150, text: '[SYSTEM] Synchronizing with runtime...', color: DIM_GREEN },
+      { delay: 200, text: '[SYSTEM] Terminal ready', color: GREEN }
+    ];
+    
+    for (const msg of messages) {
+      await this.sleep(msg.delay);
+      terminal.write(msg.color + msg.text + RESET + '\r\n');
+    }
+    
+    terminal.write('\r\n');
+  }
+  
+  async matrixRainEffect(terminal, duration) {
+    const cols = terminal.cols;
+    const rows = terminal.rows;
+    const drops = new Array(Math.floor(cols / 3)).fill(0);
+    
+    for (let i = 0; i < duration * 20; i++) {
+      let output = '';
+      for (let j = 0; j < drops.length; j++) {
+        const x = j * 3;
+        if (drops[j] > 0 && drops[j] <= rows) {
+          const char = String.fromCharCode(0x30 + Math.floor(Math.random() * 10));
+          const brightness = 1 - (drops[j] / rows);
+          const color = brightness > 0.7 ? '\x1b[1;32m' : brightness > 0.3 ? '\x1b[0;32m' : '\x1b[2;32m';
+          output += `\x1b[${drops[j]};${x}H${color}${char}\x1b[0m`;
+        }
+        if (Math.random() > 0.95) {
+          drops[j] = 1;
+        } else if (drops[j] > 0) {
+          drops[j]++;
+        }
+        if (drops[j] > rows) {
+          drops[j] = 0;
+        }
+      }
+      terminal.write(output);
+      await this.sleep(50);
+    }
+  }
+  
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
   
   setupSessionManagement() {
@@ -896,6 +1084,12 @@ class TerminalManager {
   }
   
   async restoreSession(sessionData) {
+    // Session restoration disabled to prevent infinite loops
+    console.log('Session restoration is currently disabled');
+    return;
+    
+    // Original code commented out
+    /*
     if (!sessionData || !sessionData.terminals) return;
     
     console.log('Restoring session with', sessionData.terminals.length, 'terminals');
@@ -940,10 +1134,19 @@ class TerminalManager {
     if (sessionData.splitLayout && this.splitManager) {
       this.splitManager.restoreLayout(sessionData.splitLayout);
     }
+    */
   }
 }
 
 // Initialize terminal manager when page loads
 document.addEventListener('DOMContentLoaded', () => {
+  // Clear any stored session data to prevent loops
+  try {
+    localStorage.removeItem('zeamiterm-session');
+    sessionStorage.clear();
+  } catch (e) {
+    console.error('Failed to clear session storage:', e);
+  }
+  
   window.terminalManager = new TerminalManager();
 });

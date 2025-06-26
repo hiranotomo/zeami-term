@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const { PtyService } = require('./ptyService');
 const { SessionManager } = require('./sessionManager');
+const AutoUpdaterManager = require('./autoUpdater');
 
 // Get version from package.json
 const packageInfo = require('../../package.json');
@@ -11,6 +12,7 @@ const appVersion = packageInfo.version;
 let mainWindow;
 let ptyService;
 let sessionManager;
+let autoUpdaterManager;
 
 function createWindow() {
   // Create the browser window with VS Code-like appearance
@@ -39,10 +41,10 @@ function createWindow() {
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    // Open dev tools in development
-    if (process.env.NODE_ENV !== 'production') {
-      mainWindow.webContents.openDevTools();
-    }
+    // Open dev tools in development - DISABLED
+    // if (process.env.NODE_ENV !== 'production') {
+    //   mainWindow.webContents.openDevTools();
+    // }
   });
 
   // Load the index.html file
@@ -50,6 +52,10 @@ function createWindow() {
 
   // Handle window closed
   mainWindow.on('closed', () => {
+    // Remove all event listeners from ptyService before nulling mainWindow
+    if (ptyService) {
+      ptyService.removeAllListeners();
+    }
     mainWindow = null;
   });
   
@@ -62,13 +68,13 @@ function createWindow() {
   // Setup IPC handlers for terminal operations
   setupIpcHandlers();
   
-  // Load previous session after window is ready
-  setTimeout(() => {
-    const previousSession = sessionManager.loadSession();
-    if (previousSession) {
-      mainWindow.webContents.send('session:restore', previousSession);
-    }
-  }, 500);
+  // Load previous session after window is ready - DISABLED
+  // setTimeout(() => {
+  //   const previousSession = sessionManager.loadSession();
+  //   if (previousSession) {
+  //     mainWindow.webContents.send('session:restore', previousSession);
+  //   }
+  // }, 500);
 }
 
 // Setup IPC handlers
@@ -119,17 +125,23 @@ function setupIpcHandlers() {
   
   // Handle data from PTY to renderer
   ptyService.on('data', ({ id, data }) => {
-    mainWindow.webContents.send('terminal:data', { id, data });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('terminal:data', { id, data });
+    }
   });
   
   // Handle PTY exit
   ptyService.on('exit', ({ id, code, signal, error }) => {
-    mainWindow.webContents.send('terminal:exit', { id, code, signal, error });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('terminal:exit', { id, code, signal, error });
+    }
   });
   
   // Handle menu actions from main process
   ipcMain.on('menu-action', (event, action) => {
-    mainWindow.webContents.send('menu-action', action);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('menu-action', action);
+    }
   });
   
   // Session management handlers
@@ -176,7 +188,9 @@ function createApplicationMenu() {
         { label: 'About ZeamiTerm', role: 'about' },
         { type: 'separator' },
         { label: 'Preferences...', accelerator: 'Cmd+,', click: () => {
-          mainWindow.webContents.send('menu-action', 'preferences');
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('menu-action', 'preferences');
+          }
         }},
         { type: 'separator' },
         { label: 'Services', role: 'services', submenu: [] },
@@ -197,14 +211,18 @@ function createApplicationMenu() {
           label: 'New Terminal', 
           accelerator: isMac ? 'Cmd+T' : 'Ctrl+T', 
           click: () => {
-            mainWindow.webContents.send('menu-action', 'new-terminal');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('menu-action', 'new-terminal');
+            }
           }
         },
         { 
           label: 'Split Terminal', 
           accelerator: isMac ? 'Cmd+D' : 'Ctrl+D', 
           click: () => {
-            mainWindow.webContents.send('menu-action', 'split-terminal');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('menu-action', 'split-terminal');
+            }
           }
         },
         { type: 'separator' },
@@ -212,14 +230,18 @@ function createApplicationMenu() {
           label: 'Clear', 
           accelerator: isMac ? 'Cmd+K' : 'Ctrl+K', 
           click: () => {
-            mainWindow.webContents.send('menu-action', 'clear-terminal');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('menu-action', 'clear-terminal');
+            }
           }
         },
         { 
           label: 'Close Terminal', 
           accelerator: isMac ? 'Cmd+W' : 'Ctrl+W', 
           click: () => {
-            mainWindow.webContents.send('menu-action', 'close-terminal');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('menu-action', 'close-terminal');
+            }
           }
         }
       ]
@@ -241,7 +263,9 @@ function createApplicationMenu() {
           label: 'Find', 
           accelerator: 'CmdOrCtrl+F', 
           click: () => {
-            mainWindow.webContents.send('menu-action', 'find');
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('menu-action', 'find');
+            }
           }
         }
       ]
@@ -281,6 +305,15 @@ function createApplicationMenu() {
       label: 'Help',
       submenu: [
         {
+          label: 'Check for Updates...',
+          click: () => {
+            if (autoUpdaterManager) {
+              autoUpdaterManager.checkForUpdatesManually();
+            }
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'Learn More',
           click: async () => {
             const { shell } = require('electron');
@@ -315,6 +348,15 @@ app.whenReady().then(() => {
   createApplicationMenu();
   createWindow();
   
+  // Initialize auto updater
+  autoUpdaterManager = new AutoUpdaterManager();
+  autoUpdaterManager.setMainWindow(mainWindow);
+  
+  // Check for updates after 5 seconds
+  setTimeout(() => {
+    autoUpdaterManager.checkForUpdates();
+  }, 5000);
+  
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -323,17 +365,20 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  // Save session before closing
-  if (mainWindow) {
-    mainWindow.webContents.send('session:request-save');
-  }
+  // Set mainWindow to null immediately to prevent access after close
+  mainWindow = null;
   
   // Clean up all PTY processes before quitting
-  cleanupPtyProcesses();
-  
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  cleanupPtyProcesses().then(() => {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  }).catch((error) => {
+    console.error('[Main] Error during cleanup:', error);
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
 });
 
 app.on('before-quit', (event) => {
@@ -360,6 +405,9 @@ app.on('will-quit', (event) => {
 // Helper function to clean up PTY processes
 async function cleanupPtyProcesses() {
   if (!ptyService) return;
+  
+  // Remove all event listeners to prevent further events
+  ptyService.removeAllListeners();
   
   console.log('[Main] Cleaning up PTY processes...');
   

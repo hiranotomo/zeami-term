@@ -109,7 +109,7 @@ class PtyService extends EventEmitter {
     const config = {
       shell: options.shell || this.config.defaultShell,
       args: options.args || [],
-      cwd: options.cwd || os.homedir(), // Always start in home directory
+      cwd: os.homedir(), // Always start in home directory
       env: { ...this.config.env, ...options.env },
       cols: options.cols || 80,
       rows: options.rows || 30

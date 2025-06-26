@@ -1,0 +1,18 @@
+# ZeamiTerm Shell Configuration
+# This file is automatically sourced when ZeamiTerm starts
+
+# Set ZeamiTerm path
+export ZEAMI_TERM_PATH="$HOME/develop/Zeami-1/projects/zeami-term"
+
+# Source the ZeamiTerm shell integration
+if [[ -f "$ZEAMI_TERM_PATH/scripts/zeami-shell-init.zsh" ]]; then
+    source "$ZEAMI_TERM_PATH/scripts/zeami-shell-init.zsh"
+fi
+
+# Set terminal title
+echo -ne "\033]0;ZeamiTerm\007"
+
+# Custom prompt for ZeamiTerm
+if [[ -n "$ZSH_VERSION" ]]; then
+    PROMPT='%F{green}zeami%f:%F{cyan}%~%f %# '
+fi
