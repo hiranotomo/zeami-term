@@ -11,7 +11,7 @@
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
-    "dist": "npm run rebuild && npm run build",
+    "dist": "npm run build",
     "rebuild": "electron-rebuild -f -w node-pty",
     "test": "jest",
     "test:direct": "node test/terminal.test.js",
@@ -27,23 +27,6 @@
   ],
   "author": "Zeami Team",
   "license": "MIT",
-  "build": {
-    "appId": "com.zeami.term",
-    "productName": "ZeamiTerm",
-    "directories": {
-      "output": "dist"
-    },
-    "mac": {
-      "category": "public.app-category.developer-tools"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "linux": {
-      "target": "AppImage",
-      "category": "Development"
-    }
-  },
   "devDependencies": {
     "electron": "^28.1.0",
     "electron-builder": "^26.0.12",

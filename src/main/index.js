@@ -1,10 +1,16 @@
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const { PtyService } = require('./ptyService');
+const { SessionManager } = require('./sessionManager');
+
+// Get version from package.json
+const packageInfo = require('../../package.json');
+const appVersion = packageInfo.version;
 
 // Keep a global reference of the window object
 let mainWindow;
 let ptyService;
+let sessionManager;
 
 function createWindow() {
   // Create the browser window with VS Code-like appearance
@@ -24,7 +30,7 @@ function createWindow() {
     vibrancy: process.platform === 'darwin' ? 'sidebar' : undefined,
     transparent: process.platform === 'darwin' ? true : false,
     trafficLightPosition: process.platform === 'darwin' ? { x: 15, y: 15 } : undefined,
-    title: 'ZeamiTerm',
+    title: `ZeamiTerm (ver.${appVersion})`,
     backgroundColor: process.platform === 'darwin' ? '#00000000' : '#1e1e1e',
     show: false,
     icon: path.join(__dirname, '../../assets/icon.png')
@@ -50,8 +56,19 @@ function createWindow() {
   // Initialize PTY service
   ptyService = new PtyService();
   
+  // Initialize session manager
+  sessionManager = new SessionManager();
+  
   // Setup IPC handlers for terminal operations
   setupIpcHandlers();
+  
+  // Load previous session after window is ready
+  setTimeout(() => {
+    const previousSession = sessionManager.loadSession();
+    if (previousSession) {
+      mainWindow.webContents.send('session:restore', previousSession);
+    }
+  }, 500);
 }
 
 // Setup IPC handlers
@@ -113,6 +130,37 @@ function setupIpcHandlers() {
   // Handle menu actions from main process
   ipcMain.on('menu-action', (event, action) => {
     mainWindow.webContents.send('menu-action', action);
+  });
+  
+  // Session management handlers
+  ipcMain.handle('session:save', async (event, sessionData) => {
+    try {
+      const success = sessionManager.saveSession(sessionData);
+      return { success };
+    } catch (error) {
+      console.error('[Main] Failed to save session:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('session:load', async (event) => {
+    try {
+      const session = sessionManager.loadSession();
+      return { success: true, session };
+    } catch (error) {
+      console.error('[Main] Failed to load session:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('session:clear', async (event) => {
+    try {
+      const success = sessionManager.clearSession();
+      return { success };
+    } catch (error) {
+      console.error('[Main] Failed to clear session:', error);
+      return { success: false, error: error.message };
+    }
   });
 }
 
@@ -275,6 +323,11 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  // Save session before closing
+  if (mainWindow) {
+    mainWindow.webContents.send('session:request-save');
+  }
+  
   // Clean up all PTY processes before quitting
   cleanupPtyProcesses();
   

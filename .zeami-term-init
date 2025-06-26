@@ -1,0 +1,14 @@
+#!/bin/bash
+# ZeamiTerm initialization script
+
+# Add common Node.js paths
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.npm-global/bin:$PATH"
+
+# Create claude alias that works with ZeamiTerm
+alias claude='node --no-warnings --enable-source-maps $HOME/.npm-global/bin/claude'
+
+# Alternative: use the wrapper script
+# alias claude='/Users/hirano/develop/Zeami-1/projects/zeami-term/claude-wrapper.sh'
+
+echo "ZeamiTerm environment initialized"
+echo "You can now use 'claude' command"

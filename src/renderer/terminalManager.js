@@ -60,13 +60,21 @@ class TerminalManager {
       screenReaderMode: false,
       fastScrollModifier: this.fastScrollModifier,
       scrollOnUserInput: true,
-      smoothScrollDuration: 100,
+      smoothScrollDuration: 0, // Disable smooth scrolling for better performance
       overviewRulerWidth: 10,
+      // Performance optimizations
+      fastScrollSensitivity: 5, // Increase scroll speed
+      scrollSensitivity: 1,
+      macOptionClickForcesSelection: true,
       // Critical settings for proper input handling
       logLevel: 'warn',
       bellStyle: 'none',
       rendererType: 'canvas', // Use canvas by default for stability
-      wordSeparator: ' ()[]{}\'"'
+      wordSeparator: ' ()[]{}\'"',
+      // Additional performance settings
+      customGlyphs: true,
+      drawBoldTextInBrightColors: true,
+      minimumContrastRatio: 4.5
     };
     
     this.init();
@@ -87,6 +95,9 @@ class TerminalManager {
     // Setup event listeners
     this.setupEventListeners();
     
+    // Setup session management
+    this.setupSessionManagement();
+    
     // Create initial terminal
     const firstSession = await this.createTerminal();
     
@@ -95,6 +106,8 @@ class TerminalManager {
       setTimeout(() => {
         this.switchToTerminal(firstSession.id);
         this.focusActiveTerminal();
+        // Additional focus attempt after a longer delay
+        setTimeout(() => this.focusActiveTerminal(), 500);
       }, 100);
     }
   }
@@ -181,6 +194,11 @@ class TerminalManager {
       }, 100);
     });
     
+    // Focus terminal when clicking on the container
+    document.getElementById('terminal-container').addEventListener('click', () => {
+      this.focusActiveTerminal();
+    });
+    
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       // Cmd/Ctrl + T: New terminal
@@ -261,7 +279,14 @@ class TerminalManager {
     
     if (this.useWebGL && WebglAddon) {
       try {
+        // Configure WebGL for optimal performance
         rendererAddon = new WebglAddon.WebglAddon();
+        
+        // Enable texture atlas for better glyph rendering
+        if (rendererAddon.textureAtlas) {
+          rendererAddon.textureAtlas = true;
+        }
+        
         if (rendererAddon.onContextLoss) {
           rendererAddon.onContextLoss(() => {
             console.warn('WebGL context lost, falling back to canvas renderer');
@@ -453,24 +478,57 @@ class TerminalManager {
     
     // Handle scrolling performance
     let scrollTimer;
+    let isScrolling = false;
+    
+    // Passive event listener for better scroll performance
     terminal.element.addEventListener('wheel', (e) => {
-      if (e.shiftKey || e[this.fastScrollModifier + 'Key']) {
-        // Fast scroll mode
-        terminal.scrollLines(e.deltaY > 0 ? 10 : -10);
-        e.preventDefault();
+      // Calculate scroll lines based on delta
+      const deltaMode = e.deltaMode;
+      let scrollLines = 0;
+      
+      // Normalize scroll delta across different input devices
+      if (deltaMode === 0) { // DOM_DELTA_PIXEL
+        scrollLines = Math.ceil(Math.abs(e.deltaY) / 40);
+      } else if (deltaMode === 1) { // DOM_DELTA_LINE
+        scrollLines = Math.abs(e.deltaY);
+      } else { // DOM_DELTA_PAGE
+        scrollLines = Math.abs(e.deltaY) * terminal.rows;
       }
       
-      // Optimize rendering during scroll
-      clearTimeout(scrollTimer);
-      if (session.rendererAddon) {
-        session.rendererAddon.clearTextureAtlas?.();
+      // Apply fast scroll multiplier
+      if (e.shiftKey || e[this.fastScrollModifier + 'Key']) {
+        scrollLines *= 5;
       }
-      scrollTimer = setTimeout(() => {
-        if (session.rendererAddon) {
-          session.rendererAddon.clearTextureAtlas?.();
+      
+      // Limit scroll speed to prevent jumps
+      scrollLines = Math.min(scrollLines, 50);
+      
+      // Perform scroll
+      terminal.scrollLines(e.deltaY > 0 ? scrollLines : -scrollLines);
+      
+      // Prevent default to avoid double scrolling
+      e.preventDefault();
+      
+      // Optimize rendering during scroll
+      if (!isScrolling) {
+        isScrolling = true;
+        // Temporarily reduce render quality during scroll
+        if (session.rendererAddon && session.rendererAddon.setDimensions) {
+          terminal.options.scrollback = Math.min(terminal.options.scrollback, 5000);
         }
-      }, 100);
-    });
+      }
+      
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        isScrolling = false;
+        // Restore render quality after scroll
+        if (session.rendererAddon) {
+          terminal.options.scrollback = this.scrollbackLimit;
+          // Force re-render with full quality
+          session.fitAddon.fit();
+        }
+      }, 150);
+    }, { passive: false });
   }
   
   async connectTerminal(session) {
@@ -555,6 +613,11 @@ class TerminalManager {
         document.getElementById('status-connection').textContent = 'Connected';
         document.getElementById('status-connection').style.color = '#0dbc79';
         this.updateStatusBar(session);
+        
+        // Ensure terminal has focus after connection
+        if (this.activeTerminalId === session.id) {
+          setTimeout(() => session.terminal.focus(), 400);
+        }
       } else {
         session.terminal.write(`\x1b[31m✗ Connection failed:\x1b[0m ${result.error}\r\n`);
         document.getElementById('status-connection').textContent = 'Failed';
@@ -779,6 +842,104 @@ class TerminalManager {
       `Directory: ${session.cwd || '-'}`;
     document.getElementById('status-process').textContent = 
       `Process: ${session.process ? session.process.pid : '-'}`;
+  }
+  
+  setupSessionManagement() {
+    // Auto-save session periodically
+    setInterval(() => {
+      this.saveSession();
+    }, 30000); // Every 30 seconds
+    
+    // Save session before unload
+    window.addEventListener('beforeunload', () => {
+      this.saveSession();
+    });
+    
+    // Listen for session restore
+    if (window.electronAPI) {
+      window.electronAPI.onSessionRestore((sessionData) => {
+        this.restoreSession(sessionData);
+      });
+    }
+    
+    // Listen for save request from main process
+    if (window.electronAPI) {
+      window.electronAPI.onSessionSaveRequest(() => {
+        this.saveSession();
+      });
+    }
+  }
+  
+  async saveSession() {
+    const sessionData = {
+      terminals: Array.from(this.terminals.entries()).map(([id, session]) => ({
+        id: id,
+        title: session.title,
+        cwd: session.cwd,
+        shell: session.shell,
+        buffer: session.serializeAddon ? session.serializeAddon.serialize() : '',
+        scrollback: session.terminal.buffer.active.length,
+        activeCommand: '', // Would need command detection
+        history: [] // Would need to track command history
+      })),
+      activeTerminalId: this.activeTerminalId,
+      windowBounds: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      splitLayout: this.splitManager ? this.splitManager.getLayout() : null
+    };
+    
+    if (window.electronAPI) {
+      await window.electronAPI.saveSession(sessionData);
+    }
+  }
+  
+  async restoreSession(sessionData) {
+    if (!sessionData || !sessionData.terminals) return;
+    
+    console.log('Restoring session with', sessionData.terminals.length, 'terminals');
+    
+    // Clear existing terminals
+    this.terminals.forEach((session, id) => {
+      this.closeTerminal(id);
+    });
+    
+    // Restore each terminal
+    for (const termData of sessionData.terminals) {
+      const session = await this.createTerminal({
+        cwd: termData.cwd || null, // Use saved cwd or default to home
+        shell: termData.shell
+      });
+      
+      if (session && termData.buffer) {
+        // Restore terminal content
+        try {
+          session.terminal.write(termData.buffer);
+        } catch (e) {
+          console.error('Failed to restore terminal buffer:', e);
+        }
+      }
+      
+      // Update title
+      if (termData.title) {
+        session.title = termData.title;
+        const tab = document.getElementById(`tab-${session.id}`);
+        if (tab) {
+          tab.querySelector('.tab-title').textContent = termData.title;
+        }
+      }
+    }
+    
+    // Restore active terminal
+    if (sessionData.activeTerminalId && this.terminals.has(sessionData.activeTerminalId)) {
+      this.switchToTerminal(sessionData.activeTerminalId);
+    }
+    
+    // Restore split layout if any
+    if (sessionData.splitLayout && this.splitManager) {
+      this.splitManager.restoreLayout(sessionData.splitLayout);
+    }
   }
 }
 

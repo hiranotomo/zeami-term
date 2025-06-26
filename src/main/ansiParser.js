@@ -21,6 +21,14 @@ class AnsiParser {
       // Colors and styles
       sgr: /\x1b\[([0-9;]+)?m/g,
       
+      // Extended colors (256 color mode)
+      extendedColor: /\x1b\[38;5;(\d+)m/g,       // 256 color foreground
+      extendedBgColor: /\x1b\[48;5;(\d+)m/g,     // 256 color background
+      
+      // True color (24-bit RGB)
+      trueColor: /\x1b\[38;2;(\d+);(\d+);(\d+)m/g,       // RGB foreground
+      trueBgColor: /\x1b\[48;2;(\d+);(\d+);(\d+)m/g,     // RGB background
+      
       // Other
       bell: /\x07/g,
       backspace: /\x08/g,

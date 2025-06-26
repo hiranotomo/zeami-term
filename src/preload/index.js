@@ -29,6 +29,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   removeAllListeners: (channel) => {
     ipcRenderer.removeAllListeners(channel);
+  },
+  
+  // Session management
+  saveSession: (sessionData) => ipcRenderer.invoke('session:save', sessionData),
+  loadSession: () => ipcRenderer.invoke('session:load'),
+  clearSession: () => ipcRenderer.invoke('session:clear'),
+  
+  // Session events
+  onSessionRestore: (callback) => {
+    ipcRenderer.on('session:restore', (event, data) => callback(data));
+  },
+  onSessionSaveRequest: (callback) => {
+    ipcRenderer.on('session:request-save', (event) => callback());
   }
 });
 

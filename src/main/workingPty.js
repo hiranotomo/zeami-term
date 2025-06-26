@@ -95,7 +95,11 @@ def main():
         os.close(slave_fd)
         
         # Execute shell with proper terminal settings
-        os.execvp(shell, [shell, '-i'])
+        # For zsh/bash, use login shell to load RC files
+        if 'zsh' in shell or 'bash' in shell:
+            os.execvp(shell, [shell, '-l', '-i'])
+        else:
+            os.execvp(shell, [shell, '-i'])
     else:  # Parent
         os.close(slave_fd)
         

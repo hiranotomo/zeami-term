@@ -9,6 +9,8 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { getPtyConfig, applyTerminalModes } = require('./ptyConfig');
+const { PatternDetector } = require('./patternDetector');
+const { CommandFormatter } = require('./commandFormatter');
 
 class PtyService extends EventEmitter {
   constructor() {
@@ -16,6 +18,10 @@ class PtyService extends EventEmitter {
     this.processes = new Map();
     this.dataBufferers = new Map();
     this.flowControllers = new Map();
+    
+    // Pattern detection and formatting
+    this.patternDetector = new PatternDetector();
+    this.commandFormatters = new Map(); // Per-session formatters
     
     // Configuration
     this.config = {
@@ -46,6 +52,50 @@ class PtyService extends EventEmitter {
     env.TERM_PROGRAM = 'ZeamiTerm';
     env.TERM_PROGRAM_VERSION = '0.1.0';
     
+    // Ensure PATH includes common development tool locations
+    const devPaths = [
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/opt/homebrew/sbin',
+      `${process.env.HOME}/.npm-global/bin`,
+      `${process.env.HOME}/.cargo/bin`,
+      `${process.env.HOME}/.rbenv/shims`,
+      `${process.env.HOME}/.pyenv/shims`,
+      `${process.env.HOME}/.nvm/versions/node/*/bin`,
+      `${process.env.HOME}/go/bin`,
+      '/usr/local/go/bin',
+      `${process.env.HOME}/.local/bin`,
+      '/Applications/Visual Studio Code.app/Contents/Resources/app/bin'
+    ];
+    
+    const currentPath = env.PATH || '';
+    const pathArray = currentPath.split(':');
+    
+    devPaths.forEach(path => {
+      // Expand wildcards for nvm paths
+      if (path.includes('*')) {
+        const fs = require('fs');
+        const baseDir = path.substring(0, path.indexOf('*'));
+        if (fs.existsSync(baseDir)) {
+          try {
+            const dirs = fs.readdirSync(baseDir);
+            dirs.forEach(dir => {
+              const fullPath = path.replace('*', dir);
+              if (fs.existsSync(fullPath) && !pathArray.includes(fullPath)) {
+                pathArray.unshift(fullPath);
+              }
+            });
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+      } else if (!pathArray.includes(path) && require('fs').existsSync(path)) {
+        pathArray.unshift(path);
+      }
+    });
+    
+    env.PATH = pathArray.join(':');
+    
     // Remove problematic variables
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.ELECTRON_NO_ATTACH_CONSOLE;
@@ -59,7 +109,7 @@ class PtyService extends EventEmitter {
     const config = {
       shell: options.shell || this.config.defaultShell,
       args: options.args || [],
-      cwd: options.cwd || this.config.defaultCwd,
+      cwd: options.cwd || os.homedir(), // Always start in home directory
       env: { ...this.config.env, ...options.env },
       cols: options.cols || 80,
       rows: options.rows || 30
@@ -77,10 +127,14 @@ class PtyService extends EventEmitter {
     this.performanceInfo = this.performanceInfo || new Map();
     this.performanceInfo.set(id, performanceInfo);
     
-    // Create simple data bufferer without complex processing
+    // Create command formatter for this session
+    const commandFormatter = new CommandFormatter();
+    this.commandFormatters.set(id, commandFormatter);
+    
+    // Create data bufferer with formatting
     const bufferer = new DataBufferer(id, (data) => {
       this.emit('data', { id, data });
-    });
+    }, this.patternDetector, commandFormatter);
     this.dataBufferers.set(id, bufferer);
     
     // Create flow controller with enhanced configuration
@@ -314,10 +368,17 @@ process.on('SIGWINCH', () => {
   writeToProcess(id, data) {
     const processInfo = this.processes.get(id);
     const flowController = this.flowControllers.get(id);
+    const commandFormatter = this.commandFormatters.get(id);
     
     if (!processInfo || !processInfo.isRunning) {
       console.warn(`[PtyService] Cannot write to process ${id} - not running`);
       return;
+    }
+    
+    // Detect command for formatting (when Enter is pressed)
+    if (commandFormatter && data.includes('\r') || data.includes('\n')) {
+      // Extract the command (simplified - in reality would need to track input buffer)
+      commandFormatter.detectCommand(data.trim());
     }
     
     // If using WorkingPty, write directly to it
@@ -384,6 +445,7 @@ process.on('SIGWINCH', () => {
     }
     
     this.flowControllers.delete(id);
+    this.commandFormatters.delete(id);
     this.processes.delete(id);
     
     // Emit exit event
@@ -432,14 +494,28 @@ process.on('SIGWINCH', () => {
  * Based on VS Code's TerminalDataBufferer
  */
 class DataBufferer {
-  constructor(id, callback) {
+  constructor(id, callback, patternDetector, commandFormatter) {
     this.id = id;
     this.callback = callback;
+    this.patternDetector = patternDetector;
+    this.commandFormatter = commandFormatter;
   }
   
   write(data) {
-    // Pass through data immediately without any buffering
-    this.callback(data.toString('utf8'));
+    let text = data.toString('utf8');
+    
+    // Apply command formatting if active
+    if (this.commandFormatter) {
+      text = this.commandFormatter.format(text);
+    }
+    
+    // Apply pattern highlighting
+    if (this.patternDetector) {
+      text = this.patternDetector.highlightText(text);
+    }
+    
+    // Pass through formatted data
+    this.callback(text);
   }
   
   flush() {

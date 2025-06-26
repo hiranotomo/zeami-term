@@ -70,6 +70,12 @@ const applyTerminalModes = (pty) => {
     // Send as a single command to minimize shell prompt re-displays
     pty.write(sttyCommand + '\r');
     
+    // Setup claude alias for the session
+    setTimeout(() => {
+      const claudeAlias = "alias claude='node --no-warnings --enable-source-maps $HOME/.npm-global/bin/claude'";
+      pty.write(claudeAlias + '\r');
+    }, 300);
+    
     // Don't clear screen here - let terminalManager handle it
   } catch (error) {
     console.error('[PTY Config] Failed to apply terminal modes:', error);

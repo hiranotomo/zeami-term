@@ -290,6 +290,27 @@ class SplitManager {
     splitBtn.classList.add('active');
     splitBtn.textContent = this.orientation === 'horizontal' ? '⟂ Vertical' : '⟃ Horizontal';
   }
+  
+  getLayout() {
+    if (!this.isActive) return null;
+    
+    return {
+      mode: this.currentMode,
+      isActive: this.isActive,
+      splitRatio: this.splitRatio,
+      orientation: this.orientation
+    };
+  }
+  
+  restoreLayout(layout) {
+    if (!layout || !layout.isActive) return;
+    
+    this.splitRatio = layout.splitRatio || 0.5;
+    
+    if (layout.mode === 'horizontal' || layout.mode === 'vertical') {
+      this.enable(layout.mode);
+    }
+  }
 }
 
 // Export for use in terminalManager

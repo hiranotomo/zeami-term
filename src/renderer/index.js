@@ -46,7 +46,12 @@ async function initializeTerminal() {
     allowTransparency: true,
     cursorBlink: true,
     cursorStyle: 'block',
-    scrollback: 10000
+    scrollback: 10000,
+    // Enable extended color support
+    allowProposedApi: true,
+    customGlyphs: true,
+    drawBoldTextInBrightColors: true,
+    minimumContrastRatio: 4.5
   });
 
   // Add addons
