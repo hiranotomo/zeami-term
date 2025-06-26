@@ -22,6 +22,13 @@ class AutoUpdaterManager {
     this.checkIfEnabled();
     
     if (this.isEnabled) {
+      // Configure for private repository with public releases
+      // Use generic provider with direct download URL
+      autoUpdater.setFeedURL({
+        provider: 'generic',
+        url: 'https://github.com/hiranotomo/zeami-term/releases/latest/download'
+      });
+      
       // Disable auto download - we'll control when to download
       autoUpdater.autoDownload = false;
       autoUpdater.autoInstallOnAppQuit = true;
