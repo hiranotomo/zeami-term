@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';">
+  <title>ZeamiTerm</title>
+  <link rel="stylesheet" href="../../node_modules/xterm/css/xterm.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1e1e1e;
+      color: #cccccc;
+      overflow: hidden;
+    }
+    
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    
+    .header {
+      background: #2d2d30;
+      padding: 8px 16px;
+      border-bottom: 1px solid #464647;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .tabs-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .tab {
+      padding: 4px 12px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #cccccc;
+      font-size: 13px;
+    }
+    
+    .tab:hover {
+      background: #3e3e42;
+    }
+    
+    .tab.active {
+      background: #1e1e1e;
+      border-color: #464647;
+    }
+    
+    .tab-close {
+      margin-left: 8px;
+      opacity: 0.7;
+      cursor: pointer;
+    }
+    
+    .tab-close:hover {
+      opacity: 1;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .action-button {
+      padding: 4px 8px;
+      background: transparent;
+      border: 1px solid #464647;
+      border-radius: 4px;
+      color: #cccccc;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 12px;
+    }
+    
+    .action-button:hover {
+      background: #3e3e42;
+      border-color: #007acc;
+    }
+    
+    .action-button.active {
+      background: #007acc;
+      color: white;
+      border-color: #007acc;
+    }
+    
+    #terminal-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #1e1e1e;
+    }
+    
+    .terminal-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: none;
+    }
+    
+    .terminal-wrapper.active {
+      display: block;
+    }
+    
+    .status-bar {
+      background: #007acc;
+      color: white;
+      padding: 4px 16px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .status-info {
+      display: flex;
+      gap: 16px;
+    }
+    
+    /* Loading screen */
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #464647;
+      border-top-color: #007acc;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    /* Search UI Styles */
+    .search-container {
+      position: absolute;
+      top: 60px;
+      right: 20px;
+      background: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+    }
+    
+    #search-input {
+      background: #3c3c3c;
+      border: 1px solid #3e3e42;
+      color: #cccccc;
+      padding: 4px 8px;
+      border-radius: 3px;
+      outline: none;
+      width: 200px;
+    }
+    
+    #search-input:focus {
+      border-color: #007acc;
+    }
+    
+    .search-container button {
+      background: #0e639c;
+      border: none;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .search-container button:hover {
+      background: #1177bb;
+    }
+    
+    .search-container label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: #cccccc;
+    }
+    
+    .search-container input[type="checkbox"] {
+      margin: 0;
+    }
+    
+    #search-close {
+      background: transparent;
+      color: #cccccc;
+      font-size: 16px;
+      padding: 2px 6px;
+    }
+    
+    #search-close:hover {
+      background: #3e3e42;
+    }
+    
+    /* Tab drag and drop styles */
+    .tab.dragging {
+      opacity: 0.5;
+    }
+    
+    .tabs-container {
+      display: flex;
+      gap: 2px;
+    }
+    
+    /* Status bar improvements */
+    .status-info > span + span::before {
+      content: ' | ';
+      margin: 0 8px;
+      color: #666;
+    }
+    
+    /* Terminal scroll performance */
+    .xterm-viewport::-webkit-scrollbar {
+      width: 10px;
+    }
+    
+    .xterm-viewport::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+    
+    .xterm-viewport::-webkit-scrollbar-thumb {
+      background: #424242;
+      border-radius: 5px;
+    }
+    
+    .xterm-viewport::-webkit-scrollbar-thumb:hover {
+      background: #4e4e4e;
+    }
+    
+    /* Split view styles */
+    .split-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      transition: none;
+    }
+    
+    .split-container.split-horizontal {
+      flex-direction: row;
+    }
+    
+    .split-container.split-vertical {
+      flex-direction: column;
+    }
+    
+    .split-pane {
+      position: relative;
+      overflow: hidden;
+      transition: width 0.3s ease, height 0.3s ease;
+    }
+    
+    .split-horizontal .split-pane {
+      height: 100%;
+    }
+    
+    .split-vertical .split-pane {
+      width: 100%;
+    }
+    
+    /* Splitter handle */
+    .splitter {
+      background: #464647;
+      flex-shrink: 0;
+      position: relative;
+      user-select: none;
+    }
+    
+    .splitter:hover {
+      background: #007acc;
+    }
+    
+    .splitter-horizontal {
+      width: 4px;
+      cursor: col-resize;
+      height: 100%;
+    }
+    
+    .splitter-vertical {
+      height: 4px;
+      cursor: row-resize;
+      width: 100%;
+    }
+    
+    /* Splitter grip indicator */
+    .splitter::after {
+      content: '';
+      position: absolute;
+      background: #666;
+    }
+    
+    .splitter-horizontal::after {
+      width: 1px;
+      height: 30px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    
+    .splitter-vertical::after {
+      width: 30px;
+      height: 1px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <div class="tabs-container" id="tabs-container">
+        <!-- Tabs will be dynamically added here -->
+      </div>
+      <div class="actions">
+        <button class="action-button" id="new-terminal-btn">+ New</button>
+        <button class="action-button" id="split-terminal-btn">Split</button>
+        <button class="action-button" id="clear-terminal-btn">Clear</button>
+      </div>
+    </div>
+    
+    <div id="terminal-container">
+      <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <div>Initializing ZeamiTerm...</div>
+      </div>
+    </div>
+    
+    <div class="status-bar">
+      <div class="status-info">
+        <span id="status-shell">Shell: -</span>
+        <span id="status-cwd">Directory: -</span>
+        <span id="status-process">Process: -</span>
+      </div>
+      <div>
+        <span id="status-connection">Disconnected</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Search UI Container (hidden by default) -->
+  <div id="search-container" class="search-container" style="display: none;">
+    <input type="text" id="search-input" placeholder="Find..." />
+    <button id="search-prev" title="Previous match">▲</button>
+    <button id="search-next" title="Next match">▼</button>
+    <label>
+      <input type="checkbox" id="search-case-sensitive" />
+      <span>Case</span>
+    </label>
+    <label>
+      <input type="checkbox" id="search-whole-word" />
+      <span>Word</span>
+    </label>
+    <label>
+      <input type="checkbox" id="search-regex" />
+      <span>Regex</span>
+    </label>
+    <button id="search-close">×</button>
+  </div>
+  
+  <!-- Load xterm and addons -->
+  <script src="../../node_modules/xterm/lib/xterm.js"></script>
+  <script src="../../node_modules/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+  <script src="../../node_modules/xterm-addon-search/lib/xterm-addon-search.js"></script>
+  <script src="../../node_modules/xterm-addon-web-links/lib/xterm-addon-web-links.js"></script>
+  <script src="../../node_modules/@xterm/addon-webgl/lib/addon-webgl.js"></script>
+  <script src="../../node_modules/@xterm/addon-canvas/lib/addon-canvas.js"></script>
+  <script src="../../node_modules/@xterm/addon-serialize/lib/addon-serialize.js"></script>
+  
+  <!-- Load split manager and terminal manager -->
+  <script src="splitManager.js"></script>
+  <script src="terminalManager.js"></script>
+</body>
+</html>

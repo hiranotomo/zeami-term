@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Minimal Terminal Test</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #1e1e1e;
+      color: #ccc;
+      margin: 0;
+      padding: 20px;
+    }
+    #output {
+      white-space: pre;
+      margin-bottom: 10px;
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #444;
+      padding: 10px;
+    }
+    #status {
+      color: #4a9eff;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Minimal Terminal Test</h2>
+  <div id="status">Not connected</div>
+  <div id="output"></div>
+  <div>
+    <input type="text" id="input" placeholder="Type here and press Enter" style="width: 400px">
+    <button onclick="sendChar()">Send Char</button>
+    <button onclick="connect()">Connect</button>
+  </div>
+
+  <script>
+    let sessionId = null;
+    const output = document.getElementById('output');
+    const status = document.getElementById('status');
+    const input = document.getElementById('input');
+
+    function log(msg) {
+      output.textContent += msg + '\n';
+      output.scrollTop = output.scrollHeight;
+    }
+
+    async function connect() {
+      log('Connecting...');
+      try {
+        const result = await window.zeamiAPI.startSession({});
+        if (result.success) {
+          sessionId = result.sessionId;
+          status.textContent = 'Connected: ' + sessionId;
+          log('Connected successfully');
+          
+          // Setup listener
+          window.zeamiAPI.onTerminalData((data) => {
+            log('Received: ' + JSON.stringify(data.data.substring(0, 50)));
+          });
+        } else {
+          log('Connection failed: ' + result.error);
+        }
+      } catch (error) {
+        log('Error: ' + error.message);
+      }
+    }
+
+    function sendChar() {
+      if (sessionId && input.value) {
+        const char = input.value[0];
+        log('Sending char: ' + char);
+        window.zeamiAPI.sendInput(sessionId, char);
+        input.value = input.value.substring(1);
+      }
+    }
+
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && sessionId) {
+        log('Sending: ' + input.value);
+        window.zeamiAPI.sendInput(sessionId, input.value + '\n');
+        input.value = '';
+      }
+    });
+
+    // Auto-connect on load
+    setTimeout(connect, 500);
+  </script>
+</body>
+</html>

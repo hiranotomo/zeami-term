@@ -1,0 +1,76 @@
+{
+  "appId": "com.zeami.term",
+  "productName": "ZeamiTerm",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "src/**/*",
+    "node_modules/**/*",
+    "package.json"
+  ],
+  "extraFiles": [
+    {
+      "from": "node_modules/node-pty/build/Release",
+      "to": "node_modules/node-pty/build/Release",
+      "filter": ["*.node"]
+    }
+  ],
+  "mac": {
+    "category": "public.app-category.developer-tools",
+    "icon": "assets/icon.icns",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      }
+    ]
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "assets/icon.ico"
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64"]
+      }
+    ],
+    "category": "Development",
+    "icon": "assets"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "perMachine": true
+  },
+  "dmg": {
+    "contents": [
+      {
+        "x": 110,
+        "y": 150
+      },
+      {
+        "x": 410,
+        "y": 150,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ]
+  },
+  "asar": true,
+  "asarUnpack": [
+    "node_modules/node-pty/**/*"
+  ],
+  "publish": null
+}

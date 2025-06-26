@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Addon Loading Test</title>
+</head>
+<body>
+  <h1>Testing xterm.js addon loading</h1>
+  <pre id="output"></pre>
+  
+  <script src="node_modules/xterm/lib/xterm.js"></script>
+  <script src="node_modules/@xterm/addon-webgl/lib/addon-webgl.js"></script>
+  <script src="node_modules/@xterm/addon-canvas/lib/addon-canvas.js"></script>
+  <script src="node_modules/@xterm/addon-serialize/lib/addon-serialize.js"></script>
+  
+  <script>
+    const output = document.getElementById('output');
+    
+    // Check what's available
+    const globals = [
+      'Terminal',
+      'WebglAddon', 
+      'CanvasAddon',
+      'SerializeAddon',
+      'AddonWebgl',
+      'AddonCanvas', 
+      'AddonSerialize'
+    ];
+    
+    output.textContent = 'Checking global variables:\n\n';
+    
+    globals.forEach(name => {
+      if (window[name]) {
+        output.textContent += `✅ window.${name} exists\n`;
+        
+        // Check if it has expected structure
+        if (name !== 'Terminal' && window[name].WebglAddon) {
+          output.textContent += `   → has WebglAddon property\n`;
+        }
+        if (name !== 'Terminal' && window[name].CanvasAddon) {
+          output.textContent += `   → has CanvasAddon property\n`;
+        }
+        if (name !== 'Terminal' && window[name].SerializeAddon) {
+          output.textContent += `   → has SerializeAddon property\n`;
+        }
+      } else {
+        output.textContent += `❌ window.${name} not found\n`;
+      }
+    });
+    
+    // Try to instantiate
+    output.textContent += '\n\nTrying to instantiate:\n';
+    
+    try {
+      const term = new Terminal();
+      output.textContent += '✅ Terminal created\n';
+    } catch (e) {
+      output.textContent += `❌ Terminal error: ${e.message}\n`;
+    }
+    
+    // Check actual addon structure
+    if (window.WebglAddon) {
+      try {
+        const addon = new WebglAddon.WebglAddon();
+        output.textContent += '✅ WebGL addon created (window.WebglAddon.WebglAddon)\n';
+      } catch (e) {
+        output.textContent += `❌ WebGL addon error: ${e.message}\n`;
+      }
+    }
+    
+    if (window.CanvasAddon) {
+      try {
+        const addon = new CanvasAddon.CanvasAddon();
+        output.textContent += '✅ Canvas addon created (window.CanvasAddon.CanvasAddon)\n';
+      } catch (e) {
+        output.textContent += `❌ Canvas addon error: ${e.message}\n`;
+      }
+    }
+  </script>
+</body>
+</html>
