@@ -3,6 +3,7 @@ const path = require('path');
 const { PtyService } = require('./ptyService');
 const { SessionManager } = require('./sessionManager');
 const AutoUpdaterManager = require('./autoUpdater');
+const ZeamiErrorRecorder = require('./zeamiErrorRecorder');
 
 // Get version from package.json
 const packageInfo = require('../../package.json');
@@ -13,6 +14,7 @@ let mainWindow;
 let ptyService;
 let sessionManager;
 let autoUpdaterManager;
+let errorRecorder;
 
 function createWindow() {
   // Create the browser window with VS Code-like appearance
@@ -171,6 +173,22 @@ function setupIpcHandlers() {
       return { success };
     } catch (error) {
       console.error('[Main] Failed to clear session:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Handle error recording
+  ipcMain.handle('record-error', async (event, errorData) => {
+    try {
+      if (errorRecorder) {
+        await errorRecorder.recordError(errorData);
+        return { success: true };
+      } else {
+        console.warn('Error recorder not initialized');
+        return { success: false, error: 'Error recorder not initialized' };
+      }
+    } catch (error) {
+      console.error('[Main] Failed to record error:', error);
       return { success: false, error: error.message };
     }
   });
@@ -344,9 +362,18 @@ function createApplicationMenu() {
 }
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createApplicationMenu();
   createWindow();
+  
+  // Initialize error recorder and sync offline errors
+  try {
+    errorRecorder = new ZeamiErrorRecorder();
+    await errorRecorder.syncOfflineErrors();
+  } catch (err) {
+    console.warn('Failed to initialize error recorder:', err);
+    // Continue without error recording if initialization fails
+  }
   
   // Initialize auto updater
   autoUpdaterManager = new AutoUpdaterManager();

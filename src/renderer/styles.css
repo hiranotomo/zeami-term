@@ -157,6 +157,8 @@ select {
   height: 100%;
 }
 
+/* Selection styling managed by ThemeManager */
+
 /* Ensure terminal is visible */
 .terminal.xterm {
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;

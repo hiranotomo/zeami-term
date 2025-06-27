@@ -3,6 +3,8 @@
  * Includes WebGL rendering, selection, search, and advanced tab management
  */
 
+// Error state indicator will be loaded dynamically to avoid require issues
+
 class TerminalManager {
   constructor() {
     this.terminals = new Map();
@@ -12,6 +14,9 @@ class TerminalManager {
     
     // Split view management
     this.splitManager = null;
+    
+    // Theme management
+    this.themeManager = null;
     
     // Performance optimization settings
     this.useWebGL = true;
@@ -41,7 +46,7 @@ class TerminalManager {
         background: '#1e1e1e',
         cursor: '#ffffff',
         cursorAccent: '#000000',
-        selection: '#3a3d41',
+        selectionBackground: '#7896C84D', // Transparent blue selection (hex with alpha)
         black: '#000000',
         brightBlack: '#666666',
         red: '#cd3131',
@@ -91,6 +96,16 @@ class TerminalManager {
   async init() {
     // Hide loading screen
     document.getElementById('loading').style.display = 'none';
+    
+    // Initialize theme manager V2
+    if (window.ThemeManagerV2) {
+      console.log('[TerminalManager] Initializing ThemeManagerV2...');
+      this.themeManager = new window.ThemeManagerV2();
+      const theme = await this.themeManager.init();
+      console.log('[TerminalManager] ThemeManagerV2 initialized with theme:', theme);
+    } else {
+      console.error('[TerminalManager] ThemeManagerV2 not found!');
+    }
     
     // Initialize split manager
     if (window.SplitManager) {
@@ -276,11 +291,32 @@ class TerminalManager {
     wrapper.id = `wrapper-${id}`;
     document.getElementById('terminal-container').appendChild(wrapper);
     
-    // Create xterm instance
+    // Get theme from theme manager
+    let terminalTheme;
+    if (this.themeManager) {
+      terminalTheme = this.themeManager.getXtermTheme();
+      console.log('[TerminalManager] Using theme from ThemeManagerV2:', terminalTheme);
+    } else {
+      terminalTheme = this.defaultOptions.theme;
+      console.log('[TerminalManager] Using default theme:', terminalTheme);
+    }
+    
+    // Create xterm instance with proper theme
     const terminal = new window.Terminal({
       ...this.defaultOptions,
+      theme: terminalTheme,
       ...options
     });
+    
+    console.log('[TerminalManager] Terminal created with theme:', terminal.options.theme);
+    console.log('[TerminalManager] Selection color:', terminal.options.theme?.selectionBackground);
+    
+    // Debug: Check renderer type after addons are loaded
+    setTimeout(() => {
+      console.log('[TerminalManager] Renderer type:', this.useWebGL ? 'WebGL' : 'Canvas');
+      console.log('[TerminalManager] Terminal._core._renderService:', terminal._core?._renderService);
+      console.log('[TerminalManager] Actual theme in use:', terminal._core?._themeService?.colors);
+    }, 1000);
     
     // Create addons
     const fitAddon = new window.FitAddon.FitAddon();
@@ -362,6 +398,18 @@ class TerminalManager {
       selectionStart: null,
       selectionEnd: null
     };
+    
+    // Initialize error state indicator (safe, read-only monitoring)
+    try {
+      if (window.ErrorStateIndicator) {
+        session.errorIndicator = new window.ErrorStateIndicator(terminal, wrapper);
+      } else {
+        console.warn('ErrorStateIndicator not loaded yet');
+      }
+    } catch (err) {
+      console.warn('Failed to initialize error indicator:', err);
+      // Continue without error indicator if initialization fails
+    }
     
     this.terminals.set(id, session);
     
@@ -837,6 +885,15 @@ class TerminalManager {
         } else if (window.zeamiAPI) {
           window.zeamiAPI.endSession(session.process.sessionId);
         }
+      }
+    }
+    
+    // Dispose error indicator (safe cleanup)
+    if (session.errorIndicator) {
+      try {
+        session.errorIndicator.dispose();
+      } catch (err) {
+        console.warn('Error disposing error indicator:', err);
       }
     }
     

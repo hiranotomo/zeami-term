@@ -47,7 +47,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Auto update events
   onUpdateStatus: (callback) => {
     ipcRenderer.on('update-status', (event, data) => callback(data.event, data.data));
-  }
+  },
+  
+  // Error recording
+  recordError: (errorData) => ipcRenderer.invoke('record-error', errorData)
 });
 
 // Legacy API for backward compatibility with existing code

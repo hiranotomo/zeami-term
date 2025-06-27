@@ -1,6 +1,6 @@
 {
   "name": "zeami-term",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Smart terminal emulator for Claude Code with Zeami integration",
   "main": "src/main/index.js",
   "scripts": {
@@ -9,6 +9,7 @@
     "dev:minimal": "electron minimal-main.js",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
+    "build:mac:signed": "npm run build:mac && ./scripts/sign-app.sh",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
     "dist": "npm run build",
@@ -36,6 +37,7 @@
     "url": "https://github.com/hiranotomo/zeami-term.git"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "electron": "^28.1.0",
     "electron-builder": "^26.0.12",
     "electron-rebuild": "^3.2.9",

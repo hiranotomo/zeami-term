@@ -12,7 +12,7 @@ class AutoUpdaterManager {
     this.mainWindow = null;
     this.updateAvailable = false;
     this.downloadProgress = 0;
-    this.isEnabled = false; // Disabled by default until properly configured
+    this.isEnabled = false; // Temporarily disabled for release
     
     // Configure logger
     log.transports.file.level = 'info';
@@ -22,11 +22,13 @@ class AutoUpdaterManager {
     this.checkIfEnabled();
     
     if (this.isEnabled) {
-      // Configure for private repository with public releases
-      // Use generic provider with direct download URL
+      // Configure for GitHub releases
+      // electron-updater should automatically handle public releases from private repos
       autoUpdater.setFeedURL({
-        provider: 'generic',
-        url: 'https://github.com/hiranotomo/zeami-term/releases/latest/download'
+        provider: 'github',
+        owner: 'hiranotomo',
+        repo: 'zeami-term'
+        // Don't specify 'private' - let electron-updater auto-detect
       });
       
       // Disable auto download - we'll control when to download
@@ -38,6 +40,10 @@ class AutoUpdaterManager {
   }
   
   checkIfEnabled() {
+    // Temporarily disabled for this release
+    log.info('Auto-update temporarily disabled');
+    return;
+    
     // Don't enable in development
     if (process.env.NODE_ENV === 'development') {
       log.info('Auto-update disabled in development mode');
@@ -161,8 +167,8 @@ class AutoUpdaterManager {
       dialog.showMessageBox(this.mainWindow, {
         type: 'info',
         title: 'アップデート機能',
-        message: 'アップデート機能はまだ設定されていません。',
-        detail: 'GitHubリポジトリを作成し、package.jsonにrepository情報を追加してください。',
+        message: 'アップデート機能は一時的に無効になっています。',
+        detail: '次のリリースで再度有効になります。',
         buttons: ['OK']
       });
       return;

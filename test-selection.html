@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>xterm.js Selection Test</title>
+  <link rel="stylesheet" href="node_modules/xterm/css/xterm.css">
+</head>
+<body>
+  <h1>xterm.js Selection Color Test</h1>
+  <div id="terminal1" style="width: 600px; height: 200px; border: 1px solid #ccc; margin: 10px;">
+    <h3>Default xterm.js (no theme)</h3>
+  </div>
+  
+  <div id="terminal2" style="width: 600px; height: 200px; border: 1px solid #ccc; margin: 10px;">
+    <h3>With transparent blue selection</h3>
+  </div>
+  
+  <div id="terminal3" style="width: 600px; height: 200px; border: 1px solid #ccc; margin: 10px;">
+    <h3>With gray selection (58, 61, 65)</h3>
+  </div>
+  
+  <script src="node_modules/xterm/lib/xterm.js"></script>
+  <script>
+    // Terminal 1: Default xterm.js
+    const term1 = new Terminal();
+    term1.open(document.getElementById('terminal1'));
+    term1.write('Default xterm.js selection\r\n');
+    term1.write('Try selecting this text\r\n');
+    console.log('Terminal 1 theme:', term1.options.theme);
+    
+    // Terminal 2: With transparent blue selection
+    const term2 = new Terminal({
+      theme: {
+        selection: 'rgba(120, 150, 200, 0.3)'
+      }
+    });
+    term2.open(document.getElementById('terminal2'));
+    term2.write('Transparent blue selection (rgba(120, 150, 200, 0.3))\r\n');
+    term2.write('Try selecting this text\r\n');
+    console.log('Terminal 2 theme:', term2.options.theme);
+    
+    // Terminal 3: With gray selection
+    const term3 = new Terminal({
+      theme: {
+        selection: 'rgba(58, 61, 65, 1.0)'
+      }
+    });
+    term3.open(document.getElementById('terminal3'));
+    term3.write('Gray selection (rgba(58, 61, 65, 1.0))\r\n');
+    term3.write('Try selecting this text\r\n');
+    console.log('Terminal 3 theme:', term3.options.theme);
+    
+    // Log any theme changes
+    [term1, term2, term3].forEach((term, index) => {
+      term.onOptionsChange(() => {
+        console.log(`Terminal ${index + 1} options changed:`, term.options.theme);
+      });
+    });
+  </script>
+</body>
+</html>
