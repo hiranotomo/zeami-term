@@ -58,9 +58,13 @@ export class ZeamiTerminal extends window.Terminal {
    * Handle all terminal input data
    */
   _handleData(data) {
+    console.log('[ZeamiTerminal] _handleData called with:', data.length, 'bytes');
     try {
+      // TEMPORARILY DISABLE PASTE HANDLING TO DEBUG ISSUE
+      /*
       // Handle bracketed paste mode with proper sequence detection
       if (data.includes('\x1b[200~')) {
+        console.log('[ZeamiTerminal] Detected paste start marker');
       // Extract the paste start marker and any data after it
       const startIndex = data.indexOf('\x1b[200~');
       const beforeMarker = data.substring(0, startIndex);
@@ -77,8 +81,9 @@ export class ZeamiTerminal extends window.Terminal {
       this._pasteStartMarker = '\x1b[200~';
       this._pasteStartTime = Date.now();
       
-      // Show paste indicator
-      this.write('\r\n\x1b[33m[Pasting...]\x1b[0m');
+      // Show paste indicator (don't add newline)
+      // this.write('\x1b[33m[Pasting...]\x1b[0m');
+      console.log('[ZeamiTerminal] Paste mode started');
       
       // Buffer any data after the marker
       if (afterMarker) {
@@ -88,6 +93,7 @@ export class ZeamiTerminal extends window.Terminal {
     }
     
     if (data.includes('\x1b[201~')) {
+      console.log('[ZeamiTerminal] Detected paste end marker');
       // Extract the paste end marker and any data before it
       const endIndex = data.indexOf('\x1b[201~');
       const beforeMarker = data.substring(0, endIndex);
@@ -100,8 +106,8 @@ export class ZeamiTerminal extends window.Terminal {
       
       // Send the complete paste sequence in correct order
       if (this._ptyHandler && this._isPasting) {
-        // Clear paste indicator
-        this.write('\r\x1b[K');
+        // Clear paste indicator (commented out for now)
+        // this.write('\r\x1b[K');
         
         // Limit paste buffer size (10MB)
         const MAX_PASTE_SIZE = 10 * 1024 * 1024;
@@ -120,10 +126,11 @@ export class ZeamiTerminal extends window.Terminal {
         // Send in correct order: start marker, data, end marker
         this._ptyHandler(this._pasteStartMarker + this._pasteBuffer + '\x1b[201~');
         
-        // Show paste completion message
-        const truncatedMsg = truncated ? ' \x1b[31m(truncated)\x1b[0m' : '';
-        const msg = `\x1b[32m[Pasted ${byteCount} bytes, ${lineCount} lines in ${elapsedTime}ms]${truncatedMsg}\x1b[0m\r\n`;
-        this.write(msg);
+        // Show paste completion message (commented out for now)
+        const truncatedMsg = truncated ? ' (truncated)' : '';
+        console.log(`[ZeamiTerminal] Pasted ${byteCount} bytes, ${lineCount} lines in ${elapsedTime}ms${truncatedMsg}`);
+        // const msg = `\x1b[32m[Pasted ${byteCount} bytes, ${lineCount} lines in ${elapsedTime}ms]${truncatedMsg}\x1b[0m\r\n`;
+        // this.write(msg);
       }
       
       // Reset paste mode
@@ -141,8 +148,10 @@ export class ZeamiTerminal extends window.Terminal {
     // If we're in paste mode, buffer the data
     if (this._isPasting) {
       this._pasteBuffer += data;
+      console.log('[ZeamiTerminal] Buffering paste data, total:', this._pasteBuffer.length);
       return;
     }
+    */
     
     // If in interactive mode, let the mode handler process first
     if (this._interactiveMode && this._interactiveMode.handler) {
@@ -197,7 +206,10 @@ export class ZeamiTerminal extends window.Terminal {
     
     // Always send to PTY unless we handled a command
     if (this._ptyHandler) {
+      console.log('[ZeamiTerminal] Sending to PTY:', data.length, 'bytes');
       this._ptyHandler(data);
+    } else {
+      console.log('[ZeamiTerminal] No PTY handler available');
     }
     } catch (error) {
       console.error('[ZeamiTerminal] Error handling terminal data:', error);

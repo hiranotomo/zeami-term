@@ -510,7 +510,7 @@ export class ZeamiTermManager {
             clearTimeout(session.autoSaveTimer);
           }
           session.autoSaveTimer = setTimeout(() => {
-            this.sessionPersistence.saveSession(terminalId, session.terminal, session.process);
+            this.sessionPersistence.saveSession(session.id, session.terminal, session.process);
           }, 5000); // Save 5 seconds after last input
         });
       }
