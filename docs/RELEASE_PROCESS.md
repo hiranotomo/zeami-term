@@ -7,11 +7,12 @@ ZeamiTermのリリースプロセスは、自動アップデート機能と連�
 
 ## 前提条件
 
-- GitHubリポジトリ: `https://github.com/hiranotomo/zeami-term` (プライベート)
+- GitHubリポジトリ: `https://github.com/hiranotomo/zeami-term`
 - macOS開発環境
 - 署名証明書: `Developer ID Application: TELEPORT Co., LTD (CV92DCV37B)`
 - Node.js 18以上
 - GitHub CLI (`gh`) インストール済み
+- (オプション) Apple Developer Programメンバーシップ（公証用）
 
 ## リリース手順
 
@@ -44,12 +45,20 @@ git push origin v0.1.x  # 実際のバージョン番号
 
 ### 4. 手動ビルド（現在の方法）
 
+#### 公証あり（推奨）
 ```bash
-# xterm.jsをビルド
-npm run build:xterm
+# .envファイルを作成（初回のみ）
+cp .env.example .env
+# .envファイルを編集してApple ID情報を設定
 
-# macOS用アプリケーションをビルド
+# ビルド（自動的に公証されます）
 npm run build:mac
+```
+
+#### 公証なし
+```bash
+# 公証をスキップしてビルド
+SKIP_NOTARIZE=true npm run build:mac
 ```
 
 ### 5. GitHubリリースの作成
@@ -155,6 +164,15 @@ security find-identity -v -p codesigning
 
 # キーチェーンのロック解除
 security unlock-keychain -p "パスワード" login.keychain
+```
+
+### 公証エラー
+
+```bash
+# 公証ログの確認
+xcrun notarytool log [submission-id] --apple-id YOUR_APPLE_ID
+
+# 詳細は docs/NOTARIZATION_SETUP.md を参照
 ```
 
 ### アップデートが検出されない

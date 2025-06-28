@@ -143,6 +143,21 @@ git push origin "v$NEW_VERSION"
 echo ""
 echo "🔨 アプリケーションをビルド中..."
 echo "これには数分かかります..."
+
+# 環境変数ファイルがあれば読み込み
+if [ -f .env ]; then
+    echo "🔐 環境変数を読み込み中..."
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Apple認証情報の確認
+if [ -n "$APPLE_ID" ] && [ -n "$APPLE_ID_PASSWORD" ]; then
+    echo -e "${GREEN}✅ Apple公証が有効化されます${NC}"
+else
+    echo -e "${YELLOW}⚠️  Apple公証はスキップされます（認証情報がありません）${NC}"
+    echo "   公証を有効にするには.envファイルを作成してください"
+fi
+
 npm run build:mac
 
 # リリース作成
