@@ -5,12 +5,16 @@ All notable changes to ZeamiTerm will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.3] - 2025-01-21
 
-### Added
-- 自動アップデート機能の実装
-- GitHub Releasesからの自動更新チェック
-- アップデート通知と自動インストール
+### Fixed
+- 自動アップデート機能のテスト修正
+- 開発環境での更新チェック改善
+
+### Changed
+- アップデートエラーメッセージを日本語で分かりやすく表示
+
+## [Unreleased]
 
 ## [0.1.2] - 2025-01-20
 

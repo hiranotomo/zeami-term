@@ -199,6 +199,13 @@ export class ZeamiTerminal extends window.Terminal {
     if (this._ptyHandler) {
       this._ptyHandler(data);
     }
+    } catch (error) {
+      console.error('[ZeamiTerminal] Error handling terminal data:', error);
+      // Show error to user only for critical errors
+      if (error.message && error.message.includes('paste')) {
+        this.write(`\r\n\x1b[31m[Error: ${error.message}]\x1b[0m\r\n`);
+      }
+    }
   }
   
   /**
