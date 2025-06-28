@@ -1,9 +1,11 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, dialog, Notification } = require('electron');
 const path = require('path');
 const { PtyService } = require('./ptyService');
 const { SessionManager } = require('./sessionManager');
 const AutoUpdaterManager = require('./autoUpdater');
 const ZeamiErrorRecorder = require('./zeamiErrorRecorder');
+const { TerminalProcessManager } = require('./terminalProcessManager');
+// const { PreferenceManager } = require('../features/preferences/PreferenceManager');
 
 // Get version from package.json
 const packageInfo = require('../../package.json');
@@ -15,6 +17,8 @@ let ptyService;
 let sessionManager;
 let autoUpdaterManager;
 let errorRecorder;
+let terminalProcessManager;
+// let preferenceManager;
 
 function createWindow() {
   // Create the browser window with VS Code-like appearance
@@ -43,10 +47,10 @@ function createWindow() {
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    // Open dev tools in development - DISABLED
-    // if (process.env.NODE_ENV !== 'production') {
-    //   mainWindow.webContents.openDevTools();
-    // }
+    // Open dev tools in development - Enable for debugging
+    if (process.env.NODE_ENV !== 'production') {
+      mainWindow.webContents.openDevTools();
+    }
   });
 
   // Load the index.html file
@@ -61,14 +65,39 @@ function createWindow() {
     mainWindow = null;
   });
   
+  // Track window state
+  mainWindow.on('focus', () => {
+    mainWindow.webContents.send('window:stateChange', { isFocused: true });
+  });
+  
+  mainWindow.on('blur', () => {
+    mainWindow.webContents.send('window:stateChange', { isFocused: false });
+  });
+  
+  mainWindow.on('minimize', () => {
+    mainWindow.webContents.send('window:stateChange', { isMinimized: true });
+  });
+  
+  mainWindow.on('restore', () => {
+    mainWindow.webContents.send('window:stateChange', { isMinimized: false });
+  });
+  
   // Initialize PTY service
   ptyService = new PtyService();
+  console.log('[Main] PtyService initialized');
   
   // Initialize session manager
   sessionManager = new SessionManager();
   
+  // Initialize terminal process manager
+  terminalProcessManager = new TerminalProcessManager();
+  
+  // Initialize preference manager (main process instance)
+  // preferenceManager = new PreferenceManager();
+  
   // Setup IPC handlers for terminal operations
   setupIpcHandlers();
+  console.log('[Main] IPC handlers setup complete');
   
   // Load previous session after window is ready - DISABLED
   // setTimeout(() => {
@@ -81,10 +110,34 @@ function createWindow() {
 
 // Setup IPC handlers
 function setupIpcHandlers() {
+  // File save handler
+  ipcMain.handle('file:save', async (event, { content, defaultFilename, filters }) => {
+    try {
+      const result = await dialog.showSaveDialog(mainWindow, {
+        defaultPath: defaultFilename,
+        filters: filters || [
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+      
+      if (!result.canceled && result.filePath) {
+        const fs = require('fs').promises;
+        await fs.writeFile(result.filePath, content, 'utf8');
+        return { success: true, path: result.filePath };
+      }
+      
+      return { success: false, canceled: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
   // Create new terminal session
   ipcMain.handle('terminal:create', async (event, options) => {
     try {
+      console.log('[Main] Creating terminal with options:', options);
       const result = await ptyService.createProcess(options);
+      console.log('[Main] Terminal created:', result);
       return { success: true, ...result };
     } catch (error) {
       console.error('[Main] Failed to create terminal:', error);
@@ -127,6 +180,9 @@ function setupIpcHandlers() {
   
   // Handle data from PTY to renderer
   ptyService.on('data', ({ id, data }) => {
+    console.log(`[Main] Sending PTY data to renderer: id=${id}, length=${data.length}`);
+    
+    
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('terminal:data', { id, data });
     }
@@ -190,6 +246,121 @@ function setupIpcHandlers() {
     } catch (error) {
       console.error('[Main] Failed to record error:', error);
       return { success: false, error: error.message };
+    }
+  });
+  
+  // Handle fullscreen toggle
+  ipcMain.on('toggle-fullscreen', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    }
+  });
+  
+  // Profile management handlers
+  ipcMain.handle('profiles:get', async () => {
+    try {
+      return {
+        profiles: terminalProcessManager.getProfiles(),
+        defaultProfileId: terminalProcessManager.getDefaultProfile()?.id
+      };
+    } catch (error) {
+      console.error('[Main] Failed to get profiles:', error);
+      return { profiles: [], defaultProfileId: null };
+    }
+  });
+  
+  ipcMain.handle('profiles:add', async (event, profile) => {
+    try {
+      const newProfile = await terminalProcessManager.addProfile(profile);
+      return { success: true, profile: newProfile };
+    } catch (error) {
+      console.error('[Main] Failed to add profile:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('profiles:update', async (event, { id, updates }) => {
+    try {
+      const updatedProfile = await terminalProcessManager.updateProfile(id, updates);
+      return { success: true, profile: updatedProfile };
+    } catch (error) {
+      console.error('[Main] Failed to update profile:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('profiles:delete', async (event, id) => {
+    try {
+      const deleted = await terminalProcessManager.deleteProfile(id);
+      return { success: deleted };
+    } catch (error) {
+      console.error('[Main] Failed to delete profile:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('profiles:setDefault', async (event, id) => {
+    try {
+      await terminalProcessManager.setDefaultProfile(id);
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to set default profile:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // File operations
+  ipcMain.handle('file:open', async (event, options) => {
+    try {
+      const result = await dialog.showOpenDialog(mainWindow, options);
+      return result;
+    } catch (error) {
+      console.error('[Main] Failed to open file dialog:', error);
+      return { canceled: true, filePaths: [] };
+    }
+  });
+  
+  // External URL handler
+  ipcMain.handle('shell:openExternal', async (event, url) => {
+    try {
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to open external URL:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Command tracking handlers
+  ipcMain.handle('command:trackStart', async (event, { commandId, commandLine }) => {
+    try {
+      // TODO: Implement command tracking if needed
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to track command start:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('command:trackEnd', async (event, { commandId, exitCode }) => {
+    try {
+      // TODO: Implement command tracking if needed
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to track command end:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // File size helper
+  ipcMain.handle('file:getSize', async (event, filename) => {
+    try {
+      const fs = require('fs').promises;
+      const stats = await fs.stat(filename);
+      return stats.size;
+    } catch (error) {
+      console.error('[Main] Failed to get file size:', error);
+      return 0;
     }
   });
 }
@@ -285,7 +456,20 @@ function createApplicationMenu() {
               mainWindow.webContents.send('menu-action', 'find');
             }
           }
-        }
+        },
+        // Add Preferences for non-macOS platforms
+        ...(!isMac ? [
+          { type: 'separator' },
+          { 
+            label: 'Preferences...', 
+            accelerator: 'Ctrl+,', 
+            click: () => {
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('menu-action', 'preferences');
+              }
+            }
+          }
+        ] : [])
       ]
     },
     
@@ -363,6 +547,7 @@ function createApplicationMenu() {
 
 // App event handlers
 app.whenReady().then(async () => {
+  
   createApplicationMenu();
   createWindow();
   

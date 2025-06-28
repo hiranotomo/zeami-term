@@ -1,0 +1,57 @@
+{
+  "version": "0.1.2",
+  "internal": {
+    "help": {
+      "trigger": "help",
+      "description": "Show command help",
+      "implementation": "UnifiedHelpCommand",
+      "mode": "help"
+    },
+    "menu": {
+      "trigger": "Ctrl+?",
+      "description": "Interactive command menu (internal)",
+      "implementation": "UnifiedHelpCommand",
+      "mode": "menu",
+      "note": "Changed from ? to avoid shell conflict"
+    },
+    "clear": {
+      "trigger": "clear",
+      "description": "Clear terminal screen",
+      "implementation": "ClearCommand"
+    },
+    "infinite": {
+      "trigger": "infinite",
+      "description": "Generate endless output (Ctrl+C to stop)",
+      "implementation": "InfiniteCommand"
+    },
+    "matrix": {
+      "trigger": "matrix",
+      "description": "WebGL matrix rain effect",
+      "implementation": "MatrixCommand"
+    }
+  },
+  "shell": {
+    "?": {
+      "description": "ZeamiTerm interactive menu (shell)",
+      "script": "zeami-menu.zsh",
+      "note": "This is the shell menu, not internal"
+    },
+    "zm": {
+      "description": "Alias for ? menu",
+      "script": "zeami-menu.zsh"
+    },
+    "generate": {
+      "description": "Generate 10,000 lines of code",
+      "script": "generate-code.zsh"
+    },
+    "test": {
+      "description": "Quick performance test",
+      "script": "test-10k.zsh"
+    },
+    "about": {
+      "description": "About ZeamiTerm",
+      "script": "zeami-menu.zsh",
+      "option": "5"
+    }
+  }
+}

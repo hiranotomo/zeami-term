@@ -1,0 +1,38 @@
+--- a/src/browser/renderer/dom/DomRenderer.ts
++++ b/src/browser/renderer/dom/DomRenderer.ts
+@@ -XXX,7 +XXX,7 @@
+   private _updateSelectionStyle(): void {
+     const selectionColor = this._colors.selectionTransparent.css;
+-    this._selectionContainer.style.backgroundColor = selectionColor;
++    this._selectionContainer.style.backgroundColor = 'rgba(120, 150, 200, 0.3)';
+   }
+
+--- a/src/browser/renderer/canvas/CanvasRenderer.ts
++++ b/src/browser/renderer/canvas/CanvasRenderer.ts
+@@ -XXX,7 +XXX,7 @@
+   private _renderSelection(): void {
+     const ctx = this._ctx;
+-    ctx.fillStyle = this._colors.selectionTransparent.css;
++    ctx.fillStyle = 'rgba(120, 150, 200, 0.3)';
+     // ... selection rendering code
+   }
+
+--- a/src/browser/renderer/webgl/WebglRenderer.ts
++++ b/src/browser/renderer/webgl/WebglRenderer.ts
+@@ -XXX,7 +XXX,7 @@
+   private _renderSelection(): void {
+     const color = this._colors.selectionTransparent;
+-    this._selectionModel.selectionRgba = color.rgba;
++    this._selectionModel.selectionRgba = [120/255, 150/255, 200/255, 0.3];
+   }
+
+--- a/src/common/services/OptionsService.ts
++++ b/src/common/services/OptionsService.ts
+@@ -XXX,7 +XXX,7 @@
+   theme: {
+     foreground: '#ffffff',
+     background: '#000000',
+-    selectionBackground: '#ffffff',
++    selectionBackground: 'rgba(120, 150, 200, 0.3)',
+     // ... other theme options
+   }

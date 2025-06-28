@@ -1,0 +1,239 @@
+/**
+ * Shell Integration Styles
+ * Styles for command decorations, gutters, and tooltips
+ */
+
+/* Command gutter styles */
+.command-gutter {
+  position: absolute;
+  left: -60px;
+  width: 50px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding-right: 8px;
+  font-size: 12px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+  user-select: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.command-gutter:hover {
+  opacity: 1 !important;
+}
+
+/* Exit code indicators */
+.exit-success {
+  color: #4ec9b0;
+  font-weight: bold;
+}
+
+.exit-error {
+  color: #f44747;
+  font-weight: bold;
+}
+
+/* Duration display */
+.command-gutter .duration {
+  color: #858585;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* Command decorations in terminal */
+.xterm .command-decoration {
+  position: relative;
+}
+
+.xterm .command-decoration::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #007acc;
+  opacity: 0.5;
+}
+
+.xterm .command-decoration.success::before {
+  background: #4ec9b0;
+}
+
+.xterm .command-decoration.error::before {
+  background: #f44747;
+}
+
+/* Command tooltip */
+.command-tooltip {
+  position: absolute;
+  background: #252526;
+  border: 1px solid #464647;
+  border-radius: 4px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #cccccc;
+  min-width: 300px;
+  max-width: 500px;
+}
+
+.command-tooltip .command-detail {
+  line-height: 1.5;
+}
+
+.command-tooltip strong {
+  color: #e1e1e1;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+/* Command navigation indicators */
+.command-nav-indicator {
+  position: absolute;
+  right: 10px;
+  background: #007acc;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.command-nav-indicator.visible {
+  opacity: 1;
+}
+
+/* Terminal container adjustments for gutter */
+.terminal-wrapper.shell-integration-enabled {
+  padding-left: 60px;
+}
+
+.terminal-wrapper.shell-integration-enabled .xterm {
+  left: 0;
+}
+
+/* Scrollbar markers for commands */
+.xterm-viewport::-webkit-scrollbar {
+  width: 14px;
+}
+
+.command-scrollbar-marker {
+  position: absolute;
+  right: 0;
+  width: 14px;
+  height: 2px;
+  pointer-events: none;
+}
+
+.command-scrollbar-marker.success {
+  background: #4ec9b0;
+}
+
+.command-scrollbar-marker.error {
+  background: #f44747;
+}
+
+/* Animation for command execution */
+@keyframes command-pulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.command-executing {
+  animation: command-pulse 1.5s ease-in-out infinite;
+}
+
+/* Prompt decorations */
+.prompt-decoration {
+  position: relative;
+}
+
+.prompt-decoration::before {
+  content: '❯';
+  position: absolute;
+  left: -20px;
+  color: #4ec9b0;
+  font-weight: bold;
+}
+
+/* Command history panel */
+.command-history-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 300px;
+  background: #1e1e1e;
+  border-left: 1px solid #464647;
+  overflow-y: auto;
+  display: none;
+  z-index: 100;
+}
+
+.command-history-panel.visible {
+  display: block;
+}
+
+.command-history-item {
+  padding: 8px 12px;
+  border-bottom: 1px solid #2d2d30;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.command-history-item:hover {
+  background: #2d2d30;
+}
+
+.command-history-item .command-line {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+  color: #cccccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.command-history-item .command-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #858585;
+}
+
+.command-history-item.failed .command-line {
+  color: #f44747;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .terminal-wrapper.shell-integration-enabled {
+    padding-left: 40px;
+  }
+  
+  .command-gutter {
+    left: -40px;
+    width: 35px;
+    font-size: 11px;
+  }
+  
+  .command-gutter .duration {
+    display: none;
+  }
+}

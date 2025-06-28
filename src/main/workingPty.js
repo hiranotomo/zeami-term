@@ -201,6 +201,8 @@ if __name__ == '__main__':
     
     // Direct output without buffering to avoid character loss
     this.process.stdout.on('data', (data) => {
+      // Debug log for output
+      console.log('[WorkingPty] Output received:', data.length, 'bytes');
       // Emit data immediately as UTF-8 string
       this.emit('data', data.toString('utf8'));
     });

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minimal ZeamiTerm Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #ccc;
+            font-family: monospace;
+        }
+        #terminal {
+            width: 800px;
+            height: 400px;
+            background: black;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background: #333;
+            border: 1px solid #555;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+    <link rel="stylesheet" href="../node_modules/xterm/css/xterm.css">
+</head>
+<body>
+    <h2 style="color: #0099ff;">Minimal ZeamiTerm Test</h2>
+    <div id="terminal"></div>
+    <div id="log">
+        <h3>Debug Log:</h3>
+    </div>
+
+    <script src="../node_modules/xterm/lib/xterm.js"></script>
+    <script src="../node_modules/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+    <script>
+        const log = (msg) => {
+            const logEl = document.getElementById('log');
+            logEl.innerHTML += `<div>${new Date().toTimeString().substr(0,8)} - ${msg}</div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        };
+
+        // Create terminal
+        const terminal = new Terminal({
+            cursorBlink: true,
+            fontSize: 14,
+            fontFamily: 'Menlo, Monaco, "Courier New", monospace'
+        });
+        
+        const fitAddon = new FitAddon.FitAddon();
+        terminal.loadAddon(fitAddon);
+        
+        terminal.open(document.getElementById('terminal'));
+        fitAddon.fit();
+        
+        log('Terminal created');
+        
+        // Write welcome message
+        terminal.writeln('Minimal ZeamiTerm Test');
+        terminal.writeln('Type anything and press Enter');
+        terminal.writeln('');
+        
+        // Handle input
+        let inputBuffer = '';
+        terminal.onData((data) => {
+            log(`Input received: ${JSON.stringify(data)}`);
+            
+            if (data === '\r' || data === '\n') {
+                terminal.writeln('');
+                terminal.writeln(`You typed: ${inputBuffer}`);
+                terminal.writeln('');
+                inputBuffer = '';
+            } else if (data === '\x7f') {
+                // Backspace
+                if (inputBuffer.length > 0) {
+                    inputBuffer = inputBuffer.slice(0, -1);
+                    terminal.write('\b \b');
+                }
+            } else {
+                inputBuffer += data;
+                terminal.write(data);
+            }
+        });
+        
+        // Test direct write
+        setTimeout(() => {
+            log('Testing direct write...');
+            terminal.writeln('Direct write test: SUCCESS');
+        }, 1000);
+        
+        // Test API if available
+        if (window.electronAPI) {
+            log('Electron API available');
+            
+            // Try to create terminal
+            window.electronAPI.createTerminal({ cols: 80, rows: 24 }).then(result => {
+                log(`Terminal created: ${JSON.stringify(result)}`);
+                
+                if (result.success) {
+                    // Listen for data
+                    window.electronAPI.onTerminalData((data) => {
+                        log(`Terminal data received: id=${data.id}, length=${data.data ? data.data.length : 0}`);
+                        terminal.write(data.data);
+                    });
+                    
+                    // Send test command
+                    setTimeout(() => {
+                        log('Sending test command...');
+                        window.electronAPI.sendInput(result.id, 'echo "Hello from PTY"\n');
+                    }, 1000);
+                }
+            }).catch(err => {
+                log(`Error creating terminal: ${err.message}`);
+            });
+        } else {
+            log('Electron API not available - running in browser mode');
+        }
+    </script>
+</body>
+</html>

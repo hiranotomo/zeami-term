@@ -12,7 +12,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Terminal events
   onTerminalData: (callback) => {
-    ipcRenderer.on('terminal:data', (event, data) => callback(data));
+    console.log('[Preload] Registering terminal:data listener');
+    ipcRenderer.on('terminal:data', (event, data) => {
+      console.log('[Preload] Received terminal:data event:', data);
+      callback(data);
+    });
   },
   onTerminalExit: (callback) => {
     ipcRenderer.on('terminal:exit', (event, data) => callback(data));
@@ -50,7 +54,45 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Error recording
-  recordError: (errorData) => ipcRenderer.invoke('record-error', errorData)
+  recordError: (errorData) => ipcRenderer.invoke('record-error', errorData),
+  
+  // Window controls
+  toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen'),
+  
+  // Profile management
+  getProfiles: () => ipcRenderer.invoke('profiles:get'),
+  addProfile: (profile) => ipcRenderer.invoke('profiles:add', profile),
+  updateProfile: (id, updates) => ipcRenderer.invoke('profiles:update', { id, updates }),
+  deleteProfile: (id) => ipcRenderer.invoke('profiles:delete', id),
+  setDefaultProfile: (id) => ipcRenderer.invoke('profiles:setDefault', id),
+  
+  // File operations
+  openFile: (options) => ipcRenderer.invoke('file:open', options),
+  saveFile: (options) => ipcRenderer.invoke('file:save', options),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  
+  // Terminal focus event
+  onTerminalFocus: (callback) => {
+    ipcRenderer.on('terminal:focus', (event, terminalId) => callback(terminalId));
+  },
+  
+  // Command tracking for long-running command notifications
+  trackCommandStart: (commandId, commandLine) => ipcRenderer.invoke('command:trackStart', { commandId, commandLine }),
+  trackCommandEnd: (commandId, exitCode) => ipcRenderer.invoke('command:trackEnd', { commandId, exitCode }),
+  
+  
+  // File size helper
+  getFileSize: (filename) => ipcRenderer.invoke('file:getSize', filename),
+  
+  // Window state events
+  onWindowStateChange: (callback) => {
+    ipcRenderer.on('window:stateChange', (event, state) => callback(state));
+  },
+  
+  // Update dialog event
+  onShowUpdateDialog: (callback) => {
+    ipcRenderer.on('show-update-dialog', (event, updateInfo) => callback(updateInfo));
+  }
 });
 
 // Legacy API for backward compatibility with existing code

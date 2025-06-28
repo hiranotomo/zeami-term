@@ -133,6 +133,7 @@ class PtyService extends EventEmitter {
     
     // Create data bufferer with formatting
     const bufferer = new DataBufferer(id, (data) => {
+      console.log(`[PtyService] DataBufferer callback: id=${id}, data length=${data.length}`);
       this.emit('data', { id, data });
     }, this.patternDetector, commandFormatter);
     this.dataBufferers.set(id, bufferer);
@@ -185,9 +186,13 @@ class PtyService extends EventEmitter {
         
         // Forward PTY events
         ptyWrapper.on('data', (data) => {
+          console.log(`[PtyService] WorkingPty data received: id=${id}, length=${data.length}`);
           const bufferer = this.dataBufferers.get(id);
           if (bufferer) {
+            console.log(`[PtyService] Forwarding to bufferer`);
             bufferer.write(Buffer.from(data));
+          } else {
+            console.error(`[PtyService] No bufferer found for id=${id}`);
           }
         });
         
@@ -502,6 +507,7 @@ class DataBufferer {
   }
   
   write(data) {
+    console.log(`[DataBufferer] write called: id=${this.id}, data length=${data.length}`);
     let text = data.toString('utf8');
     
     // Apply command formatting if active
@@ -514,6 +520,7 @@ class DataBufferer {
       text = this.patternDetector.highlightText(text);
     }
     
+    console.log(`[DataBufferer] calling callback with text length=${text.length}`);
     // Pass through formatted data
     this.callback(text);
   }

@@ -8,15 +8,18 @@ class ZeamiInstance extends EventEmitter {
     super();
     this.sessionId = options.sessionId;
     this.shell = options.shell;
+    this.args = options.args || [];
     this.cwd = options.cwd;
     this.env = options.env;
+    this.profile = options.profile;
     this.ptyProcess = null;
     this.messageRouter = new MessageRouter();
     this.patternDetector = new PatternDetector();
     this.context = {
       currentDirectory: this.cwd,
       history: [],
-      detectedPatterns: []
+      detectedPatterns: [],
+      profile: this.profile
     };
   }
 
@@ -24,6 +27,7 @@ class ZeamiInstance extends EventEmitter {
     // Create terminal backend
     this.ptyProcess = new TerminalBackend({
       shell: this.shell,
+      args: this.args,
       cwd: this.cwd,
       env: this.env
     });

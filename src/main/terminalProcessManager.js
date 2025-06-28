@@ -1,26 +1,42 @@
 const { EventEmitter } = require('events');
 const { ZeamiInstance } = require('./zeamiInstance');
+const { TerminalProfileManager } = require('./profiles/TerminalProfileManager');
 
 class TerminalProcessManager extends EventEmitter {
   constructor() {
     super();
     this.sessions = new Map();
     this.nextSessionId = 1;
+    this.profileManager = new TerminalProfileManager();
+    
+    // Load saved profiles
+    this.profileManager.loadProfiles().catch(console.error);
   }
 
   async createSession(options = {}) {
     const sessionId = `session-${this.nextSessionId++}`;
     
+    // Get terminal options from profile
+    const terminalOptions = this.profileManager.createTerminalOptions(
+      options.profileId,
+      {
+        cwd: options.cwd,
+        env: {
+          TERM: 'xterm-256color',
+          ZEAMI_TERM: 'true',
+          ZEAMI_SHELL_INTEGRATION_PATH: require('path').join(__dirname, '../../shell-integration'),
+          ...options.env
+        }
+      }
+    );
+    
     const instance = new ZeamiInstance({
       sessionId,
-      shell: options.shell || process.env.SHELL || '/bin/bash',
-      cwd: options.cwd || process.env.HOME,
-      env: {
-        ...process.env,
-        TERM: 'xterm-256color',
-        ZEAMI_TERM: 'true',
-        ...options.env
-      }
+      shell: terminalOptions.shell,
+      args: terminalOptions.args,
+      cwd: terminalOptions.cwd,
+      env: terminalOptions.env,
+      profile: terminalOptions.profile
     });
 
     // Forward events
@@ -76,6 +92,45 @@ class TerminalProcessManager extends EventEmitter {
       instance.destroy();
     }
     this.sessions.clear();
+  }
+  
+  // Profile management methods
+  
+  getProfiles() {
+    return this.profileManager.getAllProfiles();
+  }
+  
+  getProfile(id) {
+    return this.profileManager.getProfile(id);
+  }
+  
+  getDefaultProfile() {
+    return this.profileManager.getDefaultProfile();
+  }
+  
+  async addProfile(profile) {
+    const newProfile = this.profileManager.addProfile(profile);
+    await this.profileManager.saveProfiles();
+    return newProfile;
+  }
+  
+  async updateProfile(id, updates) {
+    const updatedProfile = this.profileManager.updateProfile(id, updates);
+    await this.profileManager.saveProfiles();
+    return updatedProfile;
+  }
+  
+  async deleteProfile(id) {
+    const deleted = this.profileManager.deleteProfile(id);
+    if (deleted) {
+      await this.profileManager.saveProfiles();
+    }
+    return deleted;
+  }
+  
+  async setDefaultProfile(id) {
+    this.profileManager.setDefaultProfile(id);
+    await this.profileManager.saveProfiles();
   }
 }
 

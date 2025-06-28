@@ -6,6 +6,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';">
   <title>ZeamiTerm</title>
   <link rel="stylesheet" href="../../node_modules/xterm/css/xterm.css">
+  <link rel="stylesheet" href="styles/terminal-fix.css">
+  <link rel="stylesheet" href="styles/shell-integration.css">
+  <link rel="stylesheet" href="styles/enhanced-links.css">
+  <link rel="stylesheet" href="styles/profile-selector.css">
   <style>
     body {
       margin: 0;
@@ -124,6 +128,7 @@
       position: relative;
       overflow: hidden;
       background: #1e1e1e;
+      min-height: 0; /* Important for flex child */
     }
     
     .terminal-wrapper {
@@ -145,11 +150,21 @@
     .terminal-wrapper .xterm {
       height: 100%;
       width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
     }
     
     .terminal-wrapper .xterm-screen {
-      height: 100%;
-      width: 100%;
+      height: 100% !important;
+      width: 100% !important;
+    }
+    
+    .terminal-wrapper .xterm-viewport {
+      height: 100% !important;
+      width: 100% !important;
     }
     
     .status-bar {
@@ -188,6 +203,29 @@
     
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+    
+    /* Notification animations */
+    @keyframes slide-in {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slide-out {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
     }
     
     .hidden {
@@ -409,8 +447,8 @@
       </div>
       <div class="actions">
         <button class="action-button" id="new-terminal-btn">+ New</button>
-        <button class="action-button" id="split-terminal-btn">Split</button>
         <button class="action-button" id="clear-terminal-btn">Clear</button>
+        <button class="action-button" id="preferences-btn">⚙️ Preferences</button>
       </div>
     </div>
     
@@ -453,8 +491,10 @@
     <button id="search-close">×</button>
   </div>
   
-  <!-- Load xterm and addons -->
-  <script src="../../node_modules/xterm/lib/xterm.js"></script>
+  <!-- Load custom xterm.js with patches -->
+  <script src="../../build/xterm.js"></script>
+  
+  <!-- Load addons after xterm.js -->
   <script src="../../node_modules/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
   <script src="../../node_modules/xterm-addon-search/lib/xterm-addon-search.js"></script>
   <script src="../../node_modules/xterm-addon-web-links/lib/xterm-addon-web-links.js"></script>
@@ -462,13 +502,20 @@
   <script src="../../node_modules/@xterm/addon-canvas/lib/addon-canvas.js"></script>
   <script src="../../node_modules/@xterm/addon-serialize/lib/addon-serialize.js"></script>
   
-  <!-- Load split manager and terminal manager -->
-  <script src="splitManager.js"></script>
+  <!-- Load terminal manager and utilities -->
   <script src="startup-animation.js"></script>
   <script src="updateNotifier.js"></script>
   <script src="errorStateIndicator.js"></script>
   <script src="themeManager-v2.js"></script>
-  <script src="terminalManager.js"></script>
-  <script src="selection-override.js"></script>
+  <script src="claudeProgressHandler.js"></script>
+  
+  <!-- Matrix WebGL Effect -->
+  <script src="matrix-webgl.js"></script>
+  
+  <!-- New Architecture -->
+  <script type="module" src="terminalManager.js"></script>
+  
+  <!-- Session Manager Component -->
+  <script type="module" src="components/SessionManager.js"></script>
 </body>
 </html>

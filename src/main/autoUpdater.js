@@ -39,6 +39,7 @@ class AutoUpdaterManager {
     }
   }
   
+  
   checkIfEnabled() {
     // Temporarily disabled for this release
     log.info('Auto-update temporarily disabled');
@@ -88,6 +89,12 @@ class AutoUpdaterManager {
       log.info('Update available:', info);
       this.updateAvailable = true;
       this.sendStatusToWindow('update-available', info);
+      
+      // Check if it's a security update
+      const isSecurity = info.releaseNotes && 
+        (info.releaseNotes.toLowerCase().includes('security') ||
+         info.releaseNotes.toLowerCase().includes('vulnerability'));
+      
       
       // Show update available dialog
       const response = dialog.showMessageBoxSync(this.mainWindow, {

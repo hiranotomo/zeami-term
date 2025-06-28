@@ -48,3 +48,17 @@ coverage/
 .cache/
 # Notarization credentials
 .env.notarization
+
+# Test outputs
+playwright-report/
+test-results/
+
+# Shell history
+.zsh_history
+.bash_history
+.zcompdump*
+
+# Backup files
+*.backup
+test-*.sh
+test-*.html
