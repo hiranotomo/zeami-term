@@ -1,39 +1,50 @@
 # ZeamiTerm
 
-A modern terminal emulator built with Electron and xterm.js, featuring advanced capabilities inspired by VS Code's terminal implementation.
+Claude Codeとの対話を強化するElectronベースのスマートターミナルエミュレータ。VS Codeのターミナル実装を参考に、Zeamiエコシステムと統合されたモダンなターミナル環境を提供します。
 
-## Features
+## 主な機能
 
-- 🚀 **GPU Acceleration** - WebGL renderer for optimal performance
-- 📑 **Tab Management** - Multiple terminal sessions with drag-and-drop tabs
-- 🔍 **Search Functionality** - Find text within terminal output (Cmd/Ctrl+F)
-- 📋 **Smart Selection** - Mouse selection with automatic copy to clipboard
-- 🖼️ **Split View** - Horizontal/vertical split with resizable panes
-- ⚡ **Performance Optimized** - Efficient handling of large outputs
-- 🎨 **Modern UI** - Clean, VS Code-inspired interface
+- 🚀 **GPUアクセラレーション** - WebGLレンダラーによる高速描画
+- 📑 **タブ管理** - 複数ターミナルセッションの管理
+- 🔍 **検索機能** - ターミナル出力内のテキスト検索 (Cmd/Ctrl+F)
+- 📋 **スマート選択** - マウス選択でクリップボードに自動コピー
+- 🖼️ **スプリットビュー** - Tab/Horizontal/Verticalの3モード切替
+- ⚡ **パフォーマンス最適化** - 大量出力の効率的な処理
+- 🎨 **モダンUI** - VS Code風のクリーンなインターフェース
+- 🔄 **自動アップデート** - 新バージョンの自動検出とワンクリック更新
+- 🇯🇵 **日本語対応** - メニューとツールチップの完全日本語化
 
-## Technologies
+## 技術スタック
 
-- **Electron** - Cross-platform desktop application framework
-- **xterm.js** - Terminal emulator library
-- **node-pty** - Pseudo terminal implementation via Python wrapper
-- **WebGL** - Hardware-accelerated rendering
+- **Electron** - クロスプラットフォームデスクトップアプリケーションフレームワーク
+- **xterm.js** - ターミナルエミュレータライブラリ（カスタムフォーク版）
+- **node-pty** - 疑似ターミナル実装
+- **WebGL** - ハードウェアアクセラレーションレンダリング
+- **electron-updater** - 自動アップデート機能
 
-## Installation
+## インストール
+
+### ユーザー向け（推奨）
+
+[最新リリース](https://github.com/hiranotomo/zeami-term/releases/latest)から、お使いのOSに対応したインストーラーをダウンロードしてください。
+
+- **macOS**: `ZeamiTerm-x.x.x-arm64.dmg` (Apple Silicon)
+
+### 開発者向け
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/zeami-term.git
+# リポジトリをクローン
+git clone https://github.com/hiranotomo/zeami-term.git
 cd zeami-term
 
-# Install dependencies
+# 依存関係をインストール
 npm install
 
-# Run in development mode
+# 開発モードで実行
 npm run dev
 
-# Build standalone application
-./create-standalone.sh
+# アプリケーションをビルド
+npm run build:mac
 ```
 
 ## Development
@@ -57,37 +68,60 @@ zeami-term/
 - **splitManager.js** - Manages split view functionality
 - **workingPty.js** - Python-based PTY implementation
 
-## Usage
+## 使い方
 
-### Keyboard Shortcuts
+### キーボードショートカット
 
-- `Cmd/Ctrl + T` - New terminal tab
-- `Cmd/Ctrl + W` - Close current tab
-- `Cmd/Ctrl + K` - Clear terminal
-- `Cmd/Ctrl + F` - Find in terminal
-- `Cmd/Ctrl + 1-9` - Switch to tab by number
-- `Cmd/Ctrl + Shift + ]` - Next tab
-- `Cmd/Ctrl + Shift + [` - Previous tab
+- `Cmd/Ctrl + T` - 新規ターミナルタブ
+- `Cmd/Ctrl + W` - 現在のタブを閉じる
+- `Cmd/Ctrl + K` - ターミナルをクリア
+- `Cmd/Ctrl + F` - ターミナル内検索
+- `Cmd/Ctrl + 1-9` - タブ番号で切り替え
+- `Cmd/Ctrl + Shift + ]` - 次のタブ
+- `Cmd/Ctrl + Shift + [` - 前のタブ
+- `Cmd/Ctrl + Shift + N` - 新規ウィンドウ
 
-### Split View
+### スプリットビュー
 
-Click the "Split" button to split the view. Click again to toggle between horizontal and vertical orientation. Drag the splitter to resize panes.
+ヘッダーのTab/Horizontal/Verticalボタンで表示モードを切り替えます。境界線をドラッグしてペインのサイズを調整できます。
 
-## Building
+### 自動アップデート
+
+- アプリ起動5秒後に自動的に新バージョンをチェック
+- メニュー → ヘルプ → アップデートを確認 から手動チェックも可能
+- アップデートがある場合は通知され、ワンクリックで更新できます
+
+## ビルド
 
 ### macOS
 
 ```bash
-./create-standalone.sh
-# Application will be in dist/standalone/ZeamiTerm.app
+npm run build:mac
+# アプリケーションは dist/ZeamiTerm-x.x.x-arm64.dmg に作成されます
 ```
 
 ### Windows/Linux
 
 ```bash
-npm run build
-npm run package
+npm run build:win   # Windows
+npm run build:linux # Linux
 ```
+
+## リリース
+
+新しいバージョンをリリースする場合：
+
+```bash
+# 簡単リリース（推奨）
+./scripts/quick-release.sh patch  # バグ修正
+./scripts/quick-release.sh minor  # 新機能
+./scripts/quick-release.sh major  # 破壊的変更
+
+# または手動リリース
+./scripts/prepare-release.sh
+```
+
+詳細は [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) を参照してください。
 
 ## Troubleshooting
 
