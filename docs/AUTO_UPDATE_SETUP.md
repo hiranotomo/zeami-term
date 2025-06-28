@@ -1,131 +1,122 @@
-# ZeamiTerm 自動アップデート機能
+# ZeamiTerm 自動アップデート設定ガイド
 
 ## 概要
 
-ZeamiTermには、GitHub Releasesを使用した自動アップデート機能が実装されています。
-ユーザーは手動でダウンロードすることなく、新しいバージョンを自動的に取得・インストールできます。
+ZeamiTermはプライベートGitHubリポジトリでありながら、自動アップデート機能を提供します。
+GitHubの仕様により、プライベートリポジトリでも**Releasesは公開設定**にできるため、
+ソースコードを非公開にしたまま、バイナリファイルのみを配布できます。
 
-## 機能
+## 設定方法
 
-- **自動チェック**: アプリ起動後5秒で自動的にアップデートをチェック
-- **手動チェック**: Help → Check for Updates... から手動でチェック可能
-- **プログレス表示**: ダウンロード進捗を視覚的に表示
-- **日本語UI**: すべてのダイアログとメッセージは日本語で表示
+### 1. GitHub Repository設定
 
-## セットアップ手順
+1. GitHubで`zeami-term`リポジトリを開く
+2. Settings → Manage access でリポジトリをPrivateに設定
+3. Releases → 新しいリリースを作成時に「Make latest release」を選択
 
-### 1. GitHubリポジトリの準備
+### 2. リリース作成手順
 
-1. GitHubでリポジトリを作成（例: `your-username/zeami-term`）
-2. `electron-builder.yml`の設定を更新:
-   ```yaml
-   publish:
-     provider: github
-     owner: your-github-username  # ← あなたのGitHubユーザー名
-     repo: zeami-term             # ← リポジトリ名
-   ```
-
-### 2. GitHub Personal Access Tokenの設定
-
-リリースをアップロードするために必要：
-
-1. GitHub → Settings → Developer settings → Personal access tokens
-2. "Generate new token (classic)" をクリック
-3. 以下の権限を付与:
-   - `repo` (Full control of private repositories)
-4. トークンをコピー
-5. 環境変数に設定:
-   ```bash
-   export GH_TOKEN=your_github_token_here
-   ```
-
-### 3. リリースの作成
-
+#### 自動リリース（推奨）
 ```bash
-# バージョンを更新
+# バージョンをアップデート
 npm version patch  # または minor, major
 
-# ビルドと公開
-npm run publish:mac  # macOS用
-npm run publish:win  # Windows用
-npm run publish:linux  # Linux用
+# タグをプッシュ（GitHub Actionsが自動的にビルド・リリース）
+git push origin v0.1.3
 ```
 
-### 4. テスト環境での確認
+#### 手動リリース
+```bash
+# ビルド
+npm run build:mac
 
-開発環境でテストする場合：
+# GitHubでリリース作成
+# 1. https://github.com/hiranotomo/zeami-term/releases/new
+# 2. タグを作成: v0.1.3
+# 3. リリースタイトル: ZeamiTerm v0.1.3
+# 4. ビルドされたファイルをアップロード:
+#    - dist/ZeamiTerm-0.1.3-arm64.dmg
+#    - dist/ZeamiTerm-0.1.3-arm64.dmg.blockmap
+#    - dist/latest-mac.yml
+# 5. 「Publish release」をクリック
+```
 
-1. ローカルサーバーを起動:
-   ```bash
-   # releasesディレクトリを作成
-   mkdir -p releases
-   
-   # テスト用のリリースファイルを配置
-   cp dist/*.dmg releases/
-   cp dist/*.zip releases/
-   cp dist/latest-mac.yml releases/
-   
-   # HTTPサーバーを起動
-   npx http-server ./releases -p 8080 --cors
-   ```
+### 3. 必要なSecrets設定（GitHub Actions用）
 
-2. 環境変数を設定してアプリを起動:
-   ```bash
-   export NODE_ENV=development
-   npm run dev
-   ```
+GitHub Repository Settings → Secrets and variables → Actions:
 
-## アップデートフロー
+```
+APPLE_CERT_BASE64       # Apple Developer証明書（base64エンコード）
+APPLE_CERT_PASSWORD     # 証明書のパスワード  
+APPLE_ID                # Apple ID（notarization用）
+APPLE_ID_PASSWORD       # App-specific password
+APPLE_TEAM_ID           # Developer Team ID (例: CV92DCV37B)
+```
 
-1. **自動チェック**
-   - アプリ起動5秒後に自動実行
-   - バックグラウンドで静かにチェック
+### 4. アップデートの確認
 
-2. **アップデート検出**
-   - 新バージョンが見つかるとダイアログ表示
-   - ユーザーが「ダウンロード」を選択
+ユーザーは以下の方法でアップデートを確認できます：
 
-3. **ダウンロード**
-   - プログレスバーで進捗表示
-   - 右下に通知ウィンドウ表示
+1. **自動確認**: アプリ起動5秒後に自動的にチェック
+2. **手動確認**: メニュー → ヘルプ → アップデートを確認
 
-4. **インストール**
-   - ダウンロード完了後、再起動を促すダイアログ
-   - 「今すぐ再起動」でアップデート適用
+## セキュリティ考慮事項
+
+### 利点
+- ソースコードは非公開のまま
+- バイナリのみが公開される
+- 署名・公証済みのアプリを配布
+
+### 注意点
+- リリースURLは推測可能（例: https://github.com/hiranotomo/zeami-term/releases）
+- バイナリファイルは誰でもダウンロード可能
+- リリースノートも公開される
+
+## 代替案
+
+より高いセキュリティが必要な場合：
+
+### Option A: S3/CDN配信
+```javascript
+// autoUpdater.js
+autoUpdater.setFeedURL({
+  provider: 'generic',
+  url: 'https://your-private-cdn.com/zeami-term/releases'
+});
+```
+
+### Option B: 認証付き配信
+```javascript
+// カスタムプロバイダーを実装
+autoUpdater.setFeedURL({
+  provider: 'custom',
+  url: 'https://api.zeami.app/updates',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN'
+  }
+});
+```
 
 ## トラブルシューティング
 
-### アップデートが動作しない場合
+### アップデートが検出されない場合
 
-1. **署名の問題（macOS）**
-   - 未署名のアプリはアップデートできない場合があります
-   - 開発版では `dev-app-update.yml` を使用してテスト
+1. `latest-mac.yml`が正しくアップロードされているか確認
+2. バージョン番号が正しく増加しているか確認
+3. リリースが「Latest release」として公開されているか確認
 
-2. **権限の問題**
-   - アプリケーションフォルダへの書き込み権限を確認
-   - 管理者権限が必要な場合があります
+### 署名エラーが発生する場合
 
-3. **ネットワークの問題**
-   - プロキシ環境では追加設定が必要
-   - ファイアウォールでGitHubへのアクセスを許可
+1. Apple Developer証明書が有効か確認
+2. notarization が完了しているか確認
+3. `entitlements.mac.plist`の設定を確認
 
-### ログの確認
+## 開発環境でのテスト
 
-アップデートのログは以下に保存されます：
-- macOS: `~/Library/Logs/zeami-term/`
-- Windows: `%USERPROFILE%\AppData\Roaming\zeami-term\logs\`
-- Linux: `~/.config/zeami-term/logs/`
+```bash
+# 開発環境でアップデートをテスト
+NODE_ENV=production npm run dev
 
-## セキュリティ
-
-- HTTPS経由でのみアップデートをダウンロード
-- GitHub Releasesの署名検証（設定可能）
-- 差分アップデートによる効率化
-
-## 今後の改善点
-
-- [ ] 差分アップデートの実装
-- [ ] バックグラウンドダウンロード
-- [ ] アップデート履歴の表示
-- [ ] ベータチャンネルのサポート
-- [ ] 自動アップデートのオン/オフ設定
+# ログを確認
+tail -f ~/Library/Logs/zeami-term/main.log
+```

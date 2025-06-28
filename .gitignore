@@ -16,7 +16,6 @@ build/
 
 # Electron
 .electron/
-electron-builder.yml
 
 # IDE
 .vscode/
@@ -62,3 +61,15 @@ test-results/
 *.backup
 test-*.sh
 test-*.html
+
+# Certificates (NEVER commit these!)
+*.p12
+*.pfx
+*.key
+*.pem
+*.crt
+*.cer
+
+# Build artifacts but not the built xterm
+build/xterm.js
+build/xterm.js.map

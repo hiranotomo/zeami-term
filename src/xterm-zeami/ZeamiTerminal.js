@@ -21,6 +21,15 @@ export class ZeamiTerminal extends window.Terminal {
     this._interactiveMode = null;
     this._originalHandlers = new Map();
     
+    // Track current working directory
+    this.cwd = options.cwd || '/';
+    
+    // Paste handling
+    this._isPasting = false;
+    this._pasteBuffer = '';
+    this._pasteStartMarker = '';
+    this._incompleteBytesBuffer = ''; // For handling incomplete UTF-8 sequences
+    
     // Bind methods
     this._handleData = this._handleData.bind(this);
     this._processCommand = this._processCommand.bind(this);
@@ -49,6 +58,92 @@ export class ZeamiTerminal extends window.Terminal {
    * Handle all terminal input data
    */
   _handleData(data) {
+    try {
+      // Handle bracketed paste mode with proper sequence detection
+      if (data.includes('\x1b[200~')) {
+      // Extract the paste start marker and any data after it
+      const startIndex = data.indexOf('\x1b[200~');
+      const beforeMarker = data.substring(0, startIndex);
+      const afterMarker = data.substring(startIndex + 6); // 6 is length of '\x1b[200~'
+      
+      // Process any data before the marker normally
+      if (beforeMarker && this._ptyHandler) {
+        this._ptyHandler(beforeMarker);
+      }
+      
+      // Start paste mode
+      this._isPasting = true;
+      this._pasteBuffer = '';
+      this._pasteStartMarker = '\x1b[200~';
+      this._pasteStartTime = Date.now();
+      
+      // Show paste indicator
+      this.write('\r\n\x1b[33m[Pasting...]\x1b[0m');
+      
+      // Buffer any data after the marker
+      if (afterMarker) {
+        this._pasteBuffer += afterMarker;
+      }
+      return;
+    }
+    
+    if (data.includes('\x1b[201~')) {
+      // Extract the paste end marker and any data before it
+      const endIndex = data.indexOf('\x1b[201~');
+      const beforeMarker = data.substring(0, endIndex);
+      const afterMarker = data.substring(endIndex + 6); // 6 is length of '\x1b[201~'
+      
+      // Add remaining data to buffer
+      if (beforeMarker) {
+        this._pasteBuffer += beforeMarker;
+      }
+      
+      // Send the complete paste sequence in correct order
+      if (this._ptyHandler && this._isPasting) {
+        // Clear paste indicator
+        this.write('\r\x1b[K');
+        
+        // Limit paste buffer size (10MB)
+        const MAX_PASTE_SIZE = 10 * 1024 * 1024;
+        let truncated = false;
+        if (this._pasteBuffer.length > MAX_PASTE_SIZE) {
+          console.warn(`[ZeamiTerminal] Paste buffer too large (${this._pasteBuffer.length} bytes), truncating to ${MAX_PASTE_SIZE} bytes`);
+          this._pasteBuffer = this._pasteBuffer.substring(0, MAX_PASTE_SIZE);
+          truncated = true;
+        }
+        
+        // Calculate paste statistics
+        const elapsedTime = Date.now() - this._pasteStartTime;
+        const lineCount = (this._pasteBuffer.match(/\n/g) || []).length;
+        const byteCount = this._pasteBuffer.length;
+        
+        // Send in correct order: start marker, data, end marker
+        this._ptyHandler(this._pasteStartMarker + this._pasteBuffer + '\x1b[201~');
+        
+        // Show paste completion message
+        const truncatedMsg = truncated ? ' \x1b[31m(truncated)\x1b[0m' : '';
+        const msg = `\x1b[32m[Pasted ${byteCount} bytes, ${lineCount} lines in ${elapsedTime}ms]${truncatedMsg}\x1b[0m\r\n`;
+        this.write(msg);
+      }
+      
+      // Reset paste mode
+      this._isPasting = false;
+      this._pasteBuffer = '';
+      this._pasteStartMarker = '';
+      
+      // Process any data after the end marker
+      if (afterMarker && this._ptyHandler) {
+        this._ptyHandler(afterMarker);
+      }
+      return;
+    }
+    
+    // If we're in paste mode, buffer the data
+    if (this._isPasting) {
+      this._pasteBuffer += data;
+      return;
+    }
+    
     // If in interactive mode, let the mode handler process first
     if (this._interactiveMode && this._interactiveMode.handler) {
       const handled = this._interactiveMode.handler(data);

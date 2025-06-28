@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Layout Integration Test</title>
+    <link rel="stylesheet" href="../src/renderer/styles/layout.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e1e;
+            color: #cccccc;
+        }
+        
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .header {
+            background: #2d2d30;
+            padding: 8px 16px;
+            border-bottom: 1px solid #464647;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .tabs-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-button {
+            padding: 4px 8px;
+            background: transparent;
+            border: 1px solid #464647;
+            border-radius: 4px;
+            color: #cccccc;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .action-button:hover {
+            background: #3e3e42;
+            border-color: #007acc;
+        }
+        
+        #terminal-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #1e1e1e;
+        }
+        
+        /* Mock terminal styles */
+        .terminal-wrapper {
+            background: #252526;
+            color: #cccccc;
+            padding: 10px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .status-bar {
+            background: #007acc;
+            color: white;
+            padding: 4px 16px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <div id="tabs-container" class="tabs-container">
+                <!-- Tabs will be dynamically added here -->
+            </div>
+            <div class="actions">
+                <button class="action-button" id="new-terminal-btn">+ New</button>
+                <button class="action-button" id="clear-terminal-btn">Clear</button>
+                <button class="action-button" id="preferences-btn">⚙️ Preferences</button>
+            </div>
+        </div>
+        
+        <div id="terminal-container">
+            <!-- Layout content will be rendered here -->
+        </div>
+        
+        <div class="status-bar">
+            <span>Layout Integration Test</span>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Mock terminal manager for testing
+        class MockTerminalManager {
+            constructor() {
+                this.terminals = new Map();
+                this.terminalCounter = 0;
+            }
+            
+            async createTerminal() {
+                const id = `terminal-${++this.terminalCounter}`;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'terminal-wrapper';
+                wrapper.id = `wrapper-${id}`;
+                wrapper.innerHTML = `<h3>Terminal ${this.terminalCounter}</h3><p>Mock terminal content for ${id}</p>`;
+                
+                const mockTerminal = {
+                    id,
+                    wrapper,
+                    fitAddon: { fit: () => console.log(`Fit called for ${id}`) }
+                };
+                
+                this.terminals.set(id, mockTerminal);
+                
+                // Simulate adding to layout
+                if (window.layoutManager) {
+                    window.layoutManager.addTerminal(id, wrapper);
+                }
+                
+                return mockTerminal;
+            }
+            
+            closeTerminal(id) {
+                console.log(`Closing terminal ${id}`);
+                this.terminals.delete(id);
+                
+                if (window.layoutManager) {
+                    window.layoutManager.removeTerminal(id);
+                }
+            }
+            
+            focusTerminal(id) {
+                console.log(`Focusing terminal ${id}`);
+            }
+        }
+        
+        // Import and test LayoutManager
+        import { LayoutManager } from '../src/renderer/core/LayoutManager.js';
+        
+        // Initialize
+        const container = document.getElementById('terminal-container');
+        const terminalManager = new MockTerminalManager();
+        const layoutManager = new LayoutManager(container, terminalManager);
+        window.layoutManager = layoutManager;
+        
+        layoutManager.init();
+        
+        // Create initial terminals
+        terminalManager.createTerminal();
+        terminalManager.createTerminal();
+        
+        // Add event listener for new terminal button
+        document.getElementById('new-terminal-btn').addEventListener('click', () => {
+            terminalManager.createTerminal();
+        });
+        
+        // Log layout state changes
+        console.log('Initial layout state:', layoutManager.getLayoutState());
+        
+        // Test split after 2 seconds
+        setTimeout(() => {
+            console.log('Testing vertical split...');
+            layoutManager.splitVertical();
+        }, 2000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+appId: com.zeami.term
+productName: ZeamiTerm
+directories:
+  output: dist
+
+files:
+  - src/**/*
+  - build/xterm.js
+  - node_modules/**/*
+  - "!node_modules/node-pty/build/**/*"
+  - "!node_modules/*/test/**/*"
+  - "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+  - "!src/xterm/**/*"
+  - package.json
+
+# Skip native dependencies rebuild
+npmRebuild: false
+buildDependenciesFromSource: false
+
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  identity: "TELEPORT Co., LTD (CV92DCV37B)"
+  target:
+    - target: dmg
+      arch: arm64
+    - target: zip
+      arch: arm64
+
+win:
+  target: nsis
+  icon: build/icon.ico
+  verifyUpdateCodeSignature: false
+
+linux:
+  target: AppImage
+  category: Development
+  icon: build/icon.png
+
+# Auto-update configuration
+publish:
+  provider: github
+  owner: hiranotomo
+  repo: zeami-term
+  releaseType: release
+  # Note: GitHub releases can be public even if repo is private
+  # This allows auto-update to work without exposing source code
+
+# DMG configuration
+dmg:
+  sign: true
+
+# Notarization
+afterSign: scripts/notarize.js
+
+# Skip beforeBuild hook

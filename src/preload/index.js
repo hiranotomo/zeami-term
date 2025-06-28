@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Window controls
   toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen'),
+  createNewWindow: () => ipcRenderer.send('create-new-window'),
   
   // Profile management
   getProfiles: () => ipcRenderer.invoke('profiles:get'),

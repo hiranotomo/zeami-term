@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Layout System Prototype</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e1e;
+            overflow: hidden;
+        }
+        
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: grid;
+        }
+        
+        /* Vertical split */
+        .split-vertical {
+            grid-template-columns: 1fr 4px 1fr;
+        }
+        
+        /* Horizontal split */
+        .split-horizontal {
+            grid-template-rows: 1fr 4px 1fr;
+        }
+        
+        .pane {
+            background: #252526;
+            overflow: hidden;
+            position: relative;
+            min-width: 100px;
+            min-height: 100px;
+        }
+        
+        .splitter {
+            background: #3e3e42;
+            cursor: col-resize;
+            position: relative;
+            user-select: none;
+        }
+        
+        .splitter-horizontal {
+            cursor: row-resize;
+        }
+        
+        .splitter:hover {
+            background: #007acc;
+        }
+        
+        .splitter:active {
+            background: #1e8ad6;
+        }
+        
+        /* Tab container */
+        .tab-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .tab-bar {
+            display: flex;
+            background: #2d2d30;
+            height: 35px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            flex-shrink: 0;
+        }
+        
+        .tab {
+            padding: 8px 16px;
+            background: #2d2d30;
+            color: #969696;
+            cursor: pointer;
+            border-right: 1px solid #252526;
+            white-space: nowrap;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .tab:hover {
+            background: #3e3e42;
+        }
+        
+        .tab.active {
+            background: #1e1e1e;
+            color: #cccccc;
+        }
+        
+        .tab-close {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        
+        .tab-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .tab-content {
+            flex: 1;
+            background: #1e1e1e;
+            overflow: hidden;
+        }
+        
+        /* Terminal mockup */
+        .terminal-mock {
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+            color: #cccccc;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        
+        /* Nested splits */
+        .nested-container {
+            width: 100%;
+            height: 100%;
+            display: grid;
+        }
+    </style>
+</head>
+<body>
+    <div class="container split-vertical" id="root">
+        <div class="pane" id="pane1">
+            <div class="terminal-mock">Terminal 1</div>
+        </div>
+        <div class="splitter" id="splitter1"></div>
+        <div class="pane" id="pane2">
+            <!-- Nested horizontal split -->
+            <div class="nested-container split-horizontal">
+                <div class="pane">
+                    <div class="terminal-mock">Terminal 2</div>
+                </div>
+                <div class="splitter splitter-horizontal" id="splitter2"></div>
+                <div class="pane">
+                    <!-- Tab container -->
+                    <div class="tab-container">
+                        <div class="tab-bar">
+                            <div class="tab active">
+                                Terminal 3
+                                <span class="tab-close">×</span>
+                            </div>
+                            <div class="tab">
+                                Terminal 4
+                                <span class="tab-close">×</span>
+                            </div>
+                            <div class="tab">
+                                Terminal 5
+                                <span class="tab-close">×</span>
+                            </div>
+                        </div>
+                        <div class="tab-content">
+                            <div class="terminal-mock">Terminal 3 Content</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Splitter drag functionality
+        class SplitterHandler {
+            constructor(splitter, container, direction = 'vertical') {
+                this.splitter = splitter;
+                this.container = container;
+                this.direction = direction;
+                this.isDragging = false;
+                this.startPos = 0;
+                this.startSizes = [];
+                
+                this.init();
+            }
+            
+            init() {
+                this.splitter.addEventListener('mousedown', this.onMouseDown.bind(this));
+                document.addEventListener('mousemove', this.onMouseMove.bind(this));
+                document.addEventListener('mouseup', this.onMouseUp.bind(this));
+                
+                // Prevent text selection while dragging
+                this.splitter.addEventListener('selectstart', (e) => e.preventDefault());
+            }
+            
+            onMouseDown(e) {
+                this.isDragging = true;
+                this.startPos = this.direction === 'vertical' ? e.clientX : e.clientY;
+                
+                // Get current sizes
+                const computed = window.getComputedStyle(this.container);
+                if (this.direction === 'vertical') {
+                    const sizes = computed.gridTemplateColumns.split(' ');
+                    this.startSizes = [parseFloat(sizes[0]), parseFloat(sizes[2])];
+                } else {
+                    const sizes = computed.gridTemplateRows.split(' ');
+                    this.startSizes = [parseFloat(sizes[0]), parseFloat(sizes[2])];
+                }
+                
+                document.body.style.cursor = this.direction === 'vertical' ? 'col-resize' : 'row-resize';
+            }
+            
+            onMouseMove(e) {
+                if (!this.isDragging) return;
+                
+                const currentPos = this.direction === 'vertical' ? e.clientX : e.clientY;
+                const delta = currentPos - this.startPos;
+                const containerSize = this.direction === 'vertical' 
+                    ? this.container.offsetWidth 
+                    : this.container.offsetHeight;
+                
+                // Calculate new sizes
+                const totalSize = this.startSizes[0] + this.startSizes[2];
+                const deltaRatio = delta / containerSize;
+                
+                let firstSize = this.startSizes[0] + delta;
+                let secondSize = this.startSizes[2] - delta;
+                
+                // Enforce minimum sizes (100px)
+                const minSize = 100;
+                if (firstSize < minSize) {
+                    firstSize = minSize;
+                    secondSize = totalSize - minSize;
+                } else if (secondSize < minSize) {
+                    secondSize = minSize;
+                    firstSize = totalSize - minSize;
+                }
+                
+                // Apply new sizes
+                if (this.direction === 'vertical') {
+                    this.container.style.gridTemplateColumns = `${firstSize}px 4px ${secondSize}px`;
+                } else {
+                    this.container.style.gridTemplateRows = `${firstSize}px 4px ${secondSize}px`;
+                }
+            }
+            
+            onMouseUp(e) {
+                if (!this.isDragging) return;
+                
+                this.isDragging = false;
+                document.body.style.cursor = '';
+                
+                // Save the layout (would be saved to preferences in real implementation)
+                console.log('Layout saved:', {
+                    direction: this.direction,
+                    sizes: this.direction === 'vertical' 
+                        ? this.container.style.gridTemplateColumns
+                        : this.container.style.gridTemplateRows
+                });
+            }
+        }
+        
+        // Initialize splitters
+        new SplitterHandler(
+            document.getElementById('splitter1'),
+            document.getElementById('root'),
+            'vertical'
+        );
+        
+        new SplitterHandler(
+            document.getElementById('splitter2'),
+            document.querySelector('.nested-container'),
+            'horizontal'
+        );
+        
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                if (e.target.classList.contains('tab-close')) {
+                    console.log('Close tab:', tab.textContent.trim());
+                    return;
+                }
+                
+                // Remove active from all tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                // Add active to clicked tab
+                tab.classList.add('active');
+                
+                // Update content (in real implementation, would switch terminal)
+                document.querySelector('.tab-content .terminal-mock').textContent = 
+                    tab.textContent.trim() + ' Content';
+            });
+        });
+        
+        // Test ResizeObserver
+        if (window.ResizeObserver) {
+            console.log('✅ ResizeObserver is supported');
+            
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    console.log('Resized:', entry.target.id, entry.contentRect);
+                }
+            });
+            
+            // Observe panes
+            document.querySelectorAll('.pane').forEach(pane => {
+                resizeObserver.observe(pane);
+            });
+        } else {
+            console.log('❌ ResizeObserver is not supported');
+        }
+        
+        // Test performance with multiple operations
+        console.log('--- Performance Test ---');
+        const start = performance.now();
+        
+        // Simulate 100 resize operations
+        for (let i = 0; i < 100; i++) {
+            document.getElementById('root').style.gridTemplateColumns = `${50 + i}% 4px ${50 - i}%`;
+        }
+        
+        const end = performance.now();
+        console.log(`100 resize operations took ${end - start}ms`);
+    </script>
+</body>
+</html>

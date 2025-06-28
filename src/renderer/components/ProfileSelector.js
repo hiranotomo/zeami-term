@@ -25,6 +25,7 @@ export class ProfileSelector {
     // Create dropdown button
     const dropdownButton = document.createElement('button');
     dropdownButton.className = 'profile-dropdown-button';
+    dropdownButton.title = 'シェルプロファイルを選択';
     dropdownButton.innerHTML = `
       <span class="profile-icon"></span>
       <span class="profile-name">Default</span>

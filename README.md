@@ -93,6 +93,14 @@ npm run package
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
 
+## Documentation
+
+- [Architecture Overview](docs/ARCHITECTURE.md) - System architecture and design decisions
+- [Development Roadmap](docs/development/ROADMAP.md) - Feature roadmap and implementation phases
+- [VS Code/xterm Feature Comparison](docs/development/FEATURE_COMPARISON.md) - Detailed feature analysis
+- [Menu Systems](docs/MENU_SYSTEMS.md) - Understanding the dual menu system
+- [Complete Refactoring Summary](docs/COMPLETE_REFACTORING_SUMMARY.md) - Recent architectural improvements
+
 ## License
 
 MIT License - see LICENSE file for details.

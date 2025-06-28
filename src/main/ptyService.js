@@ -492,6 +492,28 @@ process.on('SIGWINCH', () => {
   generateId() {
     return `pty-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
+  
+  async cleanup() {
+    console.log('[PtyService] Cleaning up all processes...');
+    
+    // Kill all running processes
+    for (const [id, processInfo] of this.processes.entries()) {
+      if (processInfo.isRunning) {
+        this.killProcess(id, 'SIGKILL');
+      }
+    }
+    
+    // Clear all resources
+    this.processes.clear();
+    this.dataBufferers.clear();
+    this.flowControllers.clear();
+    this.commandFormatters.clear();
+    
+    // Clear performance info if exists
+    if (this.performanceInfo) {
+      this.performanceInfo.clear();
+    }
+  }
 }
 
 /**

@@ -19,10 +19,20 @@ let autoUpdaterManager;
 let errorRecorder;
 let terminalProcessManager;
 // let preferenceManager;
+const windows = new Set();
 
-function createWindow() {
+function createNewWindow() {
+  const window = createWindow(false);
+  windows.add(window);
+  window.on('closed', () => {
+    windows.delete(window);
+  });
+  return window;
+}
+
+function createWindow(isMain = true) {
   // Create the browser window with VS Code-like appearance
-  mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 600,
@@ -45,67 +55,51 @@ function createWindow() {
   });
   
   // Show window when ready to prevent visual flash
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+  window.once('ready-to-show', () => {
+    window.show();
     // Open dev tools in development - Enable for debugging
-    if (process.env.NODE_ENV !== 'production') {
-      mainWindow.webContents.openDevTools();
-    }
+    // Disabled by default - use menu to open
+    // if (process.env.NODE_ENV !== 'production') {
+    //   window.webContents.openDevTools();
+    // }
   });
 
   // Load the index.html file
-  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  window.loadFile(path.join(__dirname, '../renderer/index.html'));
 
   // Handle window closed
-  mainWindow.on('closed', () => {
-    // Remove all event listeners from ptyService before nulling mainWindow
-    if (ptyService) {
-      ptyService.removeAllListeners();
+  window.on('closed', () => {
+    if (isMain) {
+      // Remove all event listeners from ptyService before nulling mainWindow
+      if (ptyService) {
+        ptyService.removeAllListeners();
+      }
+      mainWindow = null;
     }
-    mainWindow = null;
   });
   
   // Track window state
-  mainWindow.on('focus', () => {
-    mainWindow.webContents.send('window:stateChange', { isFocused: true });
+  window.on('focus', () => {
+    window.webContents.send('window:stateChange', { isFocused: true });
   });
   
-  mainWindow.on('blur', () => {
-    mainWindow.webContents.send('window:stateChange', { isFocused: false });
+  window.on('blur', () => {
+    window.webContents.send('window:stateChange', { isFocused: false });
   });
   
-  mainWindow.on('minimize', () => {
-    mainWindow.webContents.send('window:stateChange', { isMinimized: true });
+  window.on('minimize', () => {
+    window.webContents.send('window:stateChange', { isMinimized: true });
   });
   
-  mainWindow.on('restore', () => {
-    mainWindow.webContents.send('window:stateChange', { isMinimized: false });
+  window.on('restore', () => {
+    window.webContents.send('window:stateChange', { isMinimized: false });
   });
   
-  // Initialize PTY service
-  ptyService = new PtyService();
-  console.log('[Main] PtyService initialized');
+  if (isMain) {
+    mainWindow = window;
+  }
   
-  // Initialize session manager
-  sessionManager = new SessionManager();
-  
-  // Initialize terminal process manager
-  terminalProcessManager = new TerminalProcessManager();
-  
-  // Initialize preference manager (main process instance)
-  // preferenceManager = new PreferenceManager();
-  
-  // Setup IPC handlers for terminal operations
-  setupIpcHandlers();
-  console.log('[Main] IPC handlers setup complete');
-  
-  // Load previous session after window is ready - DISABLED
-  // setTimeout(() => {
-  //   const previousSession = sessionManager.loadSession();
-  //   if (previousSession) {
-  //     mainWindow.webContents.send('session:restore', previousSession);
-  //   }
-  // }, 500);
+  return window;
 }
 
 // Setup IPC handlers
@@ -183,16 +177,27 @@ function setupIpcHandlers() {
     console.log(`[Main] Sending PTY data to renderer: id=${id}, length=${data.length}`);
     
     
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('terminal:data', { id, data });
-    }
+    // Send to all windows
+    BrowserWindow.getAllWindows().forEach(win => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('terminal:data', { id, data });
+      }
+    });
   });
   
   // Handle PTY exit
   ptyService.on('exit', ({ id, code, signal, error }) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('terminal:exit', { id, code, signal, error });
-    }
+    // Send to all windows
+    BrowserWindow.getAllWindows().forEach(win => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('terminal:exit', { id, code, signal, error });
+      }
+    });
+  });
+  
+  // Create new window
+  ipcMain.on('create-new-window', () => {
+    createNewWindow();
   });
   
   // Handle menu actions from main process
@@ -394,62 +399,48 @@ function createApplicationMenu() {
     
     // Terminal menu
     {
-      label: 'Terminal',
+      label: 'ターミナル',
       submenu: [
         { 
-          label: 'New Terminal', 
-          accelerator: isMac ? 'Cmd+T' : 'Ctrl+T', 
+          label: '新規ウィンドウ', 
+          accelerator: isMac ? 'Cmd+Shift+N' : 'Ctrl+Shift+N', 
           click: () => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('menu-action', 'new-terminal');
-            }
+            createNewWindow();
           }
         },
+        { type: 'separator' },
         { 
-          label: 'Split Terminal', 
-          accelerator: isMac ? 'Cmd+D' : 'Ctrl+D', 
+          label: '現在のターミナルを保存', 
+          accelerator: isMac ? 'Cmd+S' : 'Ctrl+S', 
           click: () => {
             if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('menu-action', 'split-terminal');
+              mainWindow.webContents.send('menu-action', 'save-terminal');
             }
           }
         },
         { type: 'separator' },
         { 
-          label: 'Clear', 
-          accelerator: isMac ? 'Cmd+K' : 'Ctrl+K', 
-          click: () => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('menu-action', 'clear-terminal');
-            }
-          }
-        },
-        { 
-          label: 'Close Terminal', 
+          label: 'ウィンドウを閉じる', 
           accelerator: isMac ? 'Cmd+W' : 'Ctrl+W', 
-          click: () => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('menu-action', 'close-terminal');
-            }
-          }
+          role: 'close'
         }
       ]
     },
     
     // Edit menu
     {
-      label: 'Edit',
+      label: '編集',
       submenu: [
-        { label: 'Undo', accelerator: 'CmdOrCtrl+Z', role: 'undo' },
-        { label: 'Redo', accelerator: isMac ? 'Shift+Cmd+Z' : 'Ctrl+Y', role: 'redo' },
+        { label: '元に戻す', accelerator: 'CmdOrCtrl+Z', role: 'undo' },
+        { label: 'やり直す', accelerator: isMac ? 'Shift+Cmd+Z' : 'Ctrl+Y', role: 'redo' },
         { type: 'separator' },
-        { label: 'Cut', accelerator: 'CmdOrCtrl+X', role: 'cut' },
-        { label: 'Copy', accelerator: 'CmdOrCtrl+C', role: 'copy' },
-        { label: 'Paste', accelerator: 'CmdOrCtrl+V', role: 'paste' },
-        { label: 'Select All', accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
+        { label: '切り取り', accelerator: 'CmdOrCtrl+X', role: 'cut' },
+        { label: 'コピー', accelerator: 'CmdOrCtrl+C', role: 'copy' },
+        { label: '貼り付け', accelerator: 'CmdOrCtrl+V', role: 'paste' },
+        { label: 'すべて選択', accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
         { type: 'separator' },
         { 
-          label: 'Find', 
+          label: '検索', 
           accelerator: 'CmdOrCtrl+F', 
           click: () => {
             if (mainWindow && !mainWindow.isDestroyed()) {
@@ -475,39 +466,39 @@ function createApplicationMenu() {
     
     // View menu
     {
-      label: 'View',
+      label: '表示',
       submenu: [
-        { label: 'Reload', accelerator: 'CmdOrCtrl+R', role: 'reload' },
-        { label: 'Force Reload', accelerator: 'CmdOrCtrl+Shift+R', role: 'forceReload' },
-        { label: 'Toggle Developer Tools', accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', role: 'toggleDevTools' },
+        { label: '再読み込み', accelerator: 'CmdOrCtrl+R', role: 'reload' },
+        { label: '強制再読み込み', accelerator: 'CmdOrCtrl+Shift+R', role: 'forceReload' },
+        { label: '開発者ツール', accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', role: 'toggleDevTools' },
         { type: 'separator' },
-        { label: 'Actual Size', accelerator: 'CmdOrCtrl+0', role: 'resetZoom' },
-        { label: 'Zoom In', accelerator: 'CmdOrCtrl+=', role: 'zoomIn' },
-        { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', role: 'zoomOut' },
+        { label: '実際のサイズ', accelerator: 'CmdOrCtrl+0', role: 'resetZoom' },
+        { label: 'ズームイン', accelerator: 'CmdOrCtrl+=', role: 'zoomIn' },
+        { label: 'ズームアウト', accelerator: 'CmdOrCtrl+-', role: 'zoomOut' },
         { type: 'separator' },
-        { label: 'Toggle Fullscreen', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11', role: 'togglefullscreen' }
+        { label: 'フルスクリーン', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11', role: 'togglefullscreen' }
       ]
     },
     
     // Window menu
     {
-      label: 'Window',
+      label: 'ウィンドウ',
       submenu: [
-        { label: 'Minimize', accelerator: 'CmdOrCtrl+M', role: 'minimize' },
-        { label: 'Close', accelerator: 'CmdOrCtrl+W', role: 'close' },
+        { label: '最小化', accelerator: 'CmdOrCtrl+M', role: 'minimize' },
+        { label: '閉じる', accelerator: 'CmdOrCtrl+W', role: 'close' },
         ...(isMac ? [
           { type: 'separator' },
-          { label: 'Bring All to Front', role: 'front' }
+          { label: 'すべてを前面に', role: 'front' }
         ] : [])
       ]
     },
     
     // Help menu
     {
-      label: 'Help',
+      label: 'ヘルプ',
       submenu: [
         {
-          label: 'Check for Updates...',
+          label: 'アップデートを確認...',
           click: () => {
             if (autoUpdaterManager) {
               autoUpdaterManager.checkForUpdatesManually();
@@ -519,14 +510,14 @@ function createApplicationMenu() {
           label: 'Learn More',
           click: async () => {
             const { shell } = require('electron');
-            await shell.openExternal('https://github.com/your-repo/zeami-term');
+            await shell.openExternal('https://github.com/hiranotomo/zeami-term');
           }
         },
         {
           label: 'Documentation',
           click: async () => {
             const { shell } = require('electron');
-            await shell.openExternal('https://github.com/your-repo/zeami-term/wiki');
+            await shell.openExternal('https://github.com/hiranotomo/zeami-term/wiki');
           }
         },
         { type: 'separator' },
@@ -534,7 +525,18 @@ function createApplicationMenu() {
           label: 'Report Issue',
           click: async () => {
             const { shell } = require('electron');
-            await shell.openExternal('https://github.com/your-repo/zeami-term/issues');
+            await shell.openExternal('https://github.com/hiranotomo/zeami-term/issues');
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+          click: () => {
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            if (focusedWindow) {
+              focusedWindow.webContents.toggleDevTools();
+            }
           }
         }
       ]
@@ -547,6 +549,19 @@ function createApplicationMenu() {
 
 // App event handlers
 app.whenReady().then(async () => {
+  // Initialize services before creating window
+  ptyService = new PtyService();
+  console.log('[Main] PtyService initialized');
+  
+  sessionManager = new SessionManager();
+  console.log('[Main] SessionManager initialized');
+  
+  terminalProcessManager = new TerminalProcessManager();
+  console.log('[Main] TerminalProcessManager initialized');
+  
+  // Setup IPC handlers
+  setupIpcHandlers();
+  console.log('[Main] IPC handlers setup complete');
   
   createApplicationMenu();
   createWindow();

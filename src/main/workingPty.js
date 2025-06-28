@@ -31,8 +31,13 @@ class WorkingPty extends EventEmitter {
     const env = {
       ...this.env,
       TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
       COLUMNS: this.cols.toString(),
-      LINES: this.rows.toString()
+      LINES: this.rows.toString(),
+      LANG: process.env.LANG || 'en_US.UTF-8',
+      LC_ALL: process.env.LC_ALL || 'en_US.UTF-8',
+      TERM_PROGRAM: 'ZeamiTerm',
+      TERM_PROGRAM_VERSION: '0.1.2'
     };
     
     // Run the Python script
@@ -93,6 +98,10 @@ def main():
         os.dup2(slave_fd, 1)
         os.dup2(slave_fd, 2)
         os.close(slave_fd)
+        
+        # Set proper terminal settings
+        os.environ['TERM'] = 'xterm-256color'
+        os.environ['COLORTERM'] = 'truecolor'
         
         # Execute shell with proper terminal settings
         # For zsh/bash, use login shell to load RC files

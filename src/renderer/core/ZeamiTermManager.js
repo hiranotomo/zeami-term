@@ -15,6 +15,7 @@ import { ProfileSelector } from '../components/ProfileSelector.js';
 import { SessionPersistence } from '../../features/session/SessionPersistence.js';
 import { PreferenceManager } from '../../features/preferences/PreferenceManager.js';
 import { PreferenceWindow } from '../components/PreferenceWindow.js';
+import { SimpleLayoutManager } from './SimpleLayoutManager.js';
 
 export class ZeamiTermManager {
   constructor() {
@@ -25,6 +26,7 @@ export class ZeamiTermManager {
     this.sessionPersistence = new SessionPersistence();
     this.preferenceManager = new PreferenceManager();
     this.preferenceWindow = new PreferenceWindow(this.preferenceManager);
+    this.layoutManager = null; // Will be initialized after DOM is ready
     
     // Bind methods
     this.createTerminal = this.createTerminal.bind(this);
@@ -45,6 +47,11 @@ export class ZeamiTermManager {
     // Make manager accessible globally for testing
     window.zeamiTermManager = this;
     
+    // Initialize layout manager
+    const container = document.getElementById('terminal-container');
+    this.layoutManager = new SimpleLayoutManager(container, this);
+    this.layoutManager.init();
+    
     // Load saved sessions
     this.sessionPersistence.loadFromStorage();
     
@@ -57,8 +64,34 @@ export class ZeamiTermManager {
     // Setup keyboard shortcuts
     this.setupKeyboardShortcuts();
     
-    // Create initial terminal
+    // Create initial terminals (2 by default)
     await this.createTerminal();
+    await this.createTerminal();
+    
+    // Initialize tabs UI
+    this.updateTabsUI();
+    
+    // Ensure the first terminal is visible in tab mode
+    if (this.layoutManager && this.layoutManager.mode === 'tab') {
+      this.layoutManager.updateLayout();
+    }
+    
+    // Focus the first terminal after initialization (without clearing)
+    setTimeout(() => {
+      const firstId = Array.from(this.terminals.keys())[0];
+      if (firstId) {
+        this.switchToTerminal(firstId);
+        const firstSession = this.terminals.get(firstId);
+        if (firstSession && firstSession.terminal) {
+          firstSession.terminal.focus();
+          
+          // Ensure the terminal has proper dimensions
+          if (firstSession.fitAddon) {
+            firstSession.fitAddon.fit();
+          }
+        }
+      }
+    }, 500);
   }
   
   async createTerminal(options = {}) {
@@ -74,7 +107,6 @@ export class ZeamiTermManager {
     const wrapper = document.createElement('div');
     wrapper.className = 'terminal-wrapper';
     wrapper.id = `wrapper-${id}`;
-    document.getElementById('terminal-container').appendChild(wrapper);
     
     // Get preferences
     const terminalPrefs = this.preferenceManager.getSection('terminal');
@@ -92,6 +124,7 @@ export class ZeamiTermManager {
       scrollback: terminalPrefs.scrollback,
       fastScrollModifier: terminalPrefs.fastScrollModifier,
       fastScrollSensitivity: terminalPrefs.fastScrollSensitivity,
+      cwd: options.cwd, // Pass parent directory if provided
       scrollSensitivity: terminalPrefs.scrollSensitivity,
       rendererType: terminalPrefs.rendererType === 'webgl' ? 'canvas' : terminalPrefs.rendererType,
       customGlyphs: true,
@@ -102,6 +135,12 @@ export class ZeamiTermManager {
       wordSeparator: terminalPrefs.wordSeparator,
       tabStopWidth: terminalPrefs.tabStopWidth,
       bellStyle: terminalPrefs.bellStyle,
+      // Important for Claude Code compatibility
+      convertEol: true,  // Convert CRLF to LF
+      windowsMode: false, // Use Unix-style line endings
+      macOptionIsMeta: true, // Mac Option key as Meta
+      allowProposedApi: true, // Enable proposed APIs
+      screenReaderMode: false, // Disable screen reader mode for better performance
       ...options
     });
     
@@ -111,6 +150,35 @@ export class ZeamiTermManager {
     // Register builtin commands
     this.registerBuiltinCommands(terminal);
     
+    // Handle selection for copy functionality
+    terminal.onSelectionChange(() => {
+      if (terminal.hasSelection()) {
+        const selectedText = terminal.getSelection();
+        // Store selected text for copy operations
+        terminal._lastSelectedText = selectedText;
+      }
+    });
+    
+    // Handle copy keyboard shortcut
+    terminal.attachCustomKeyEventHandler((event) => {
+      // Cmd+C on Mac, Ctrl+C on others
+      if ((event.metaKey || event.ctrlKey) && event.key === 'c') {
+        if (terminal.hasSelection()) {
+          const selectedText = terminal.getSelection();
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(selectedText).then(() => {
+              console.log('[ZeamiTermManager] Text copied to clipboard');
+              // Don't clear selection - let user decide
+            }).catch(err => {
+              console.error('[ZeamiTermManager] Failed to copy to clipboard:', err);
+            });
+          }
+          return false; // Prevent sending Ctrl+C to terminal when text is selected
+        }
+      }
+      return true; // Allow other key events
+    });
+    
     // Create addons
     const fitAddon = new window.FitAddon.FitAddon();
     terminal.loadAddon(fitAddon);
@@ -118,11 +186,6 @@ export class ZeamiTermManager {
     // Search addon with decorations
     const searchAddon = new window.SearchAddon.SearchAddon();
     terminal.loadAddon(searchAddon);
-    
-    // Configure search decorations
-    searchAddon.onDidChangeResults((results) => {
-      this.updateSearchDecorations(session, results);
-    });
     
     // Shell integration addon
     const shellIntegrationAddon = new ShellIntegrationAddon();
@@ -188,22 +251,27 @@ export class ZeamiTermManager {
     
     // Fit terminal with proper resize handling
     const fitTerminal = () => {
-      // Get the actual container dimensions
-      const rect = wrapper.getBoundingClientRect();
-      const cols = Math.floor(rect.width / 9); // Approximate char width
-      const rows = Math.floor(rect.height / 17); // Approximate char height
-      
-      // Resize terminal to exact dimensions
-      terminal.resize(cols, rows);
-      
-      // Then fit addon can fine-tune
-      fitAddon.fit();
-      
-      // Force complete refresh
-      terminal.refresh(0, terminal.rows - 1);
-      
-      // Ensure viewport is scrolled to bottom
-      terminal.scrollToBottom();
+      // Use fitAddon to calculate the optimal size
+      try {
+        fitAddon.fit();
+        
+        // Get the dimensions after fit
+        const dims = fitAddon.proposeDimensions();
+        if (dims && dims.cols && dims.rows) {
+          // Apply the dimensions if they're valid
+          if (dims.cols !== terminal.cols || dims.rows !== terminal.rows) {
+            terminal.resize(dims.cols, dims.rows);
+          }
+        }
+        
+        // Force complete refresh
+        terminal.refresh(0, terminal.rows - 1);
+        
+        // Ensure viewport is scrolled to bottom
+        terminal.scrollToBottom();
+      } catch (error) {
+        console.warn('[ZeamiTermManager] Fit error:', error);
+      }
     };
     
     // Initial fit with multiple attempts
@@ -230,20 +298,37 @@ export class ZeamiTermManager {
       rendererAddon,
       process: null,
       title: `Terminal ${this.terminalCounter}`,
-      searchDecorations: []
+      searchDecorations: [],
+      wrapper,
+      cwd: options.cwd || null
     };
     
     this.terminals.set(id, session);
-    this.activeTerminalId = id;
     
-    // Add tab
-    this.addTab(session);
+    // Only set as active if it's the first terminal or explicitly requested
+    if (!this.activeTerminalId || options.activate) {
+      this.activeTerminalId = id;
+    }
+    
+    
+    // Configure search decorations after session is created
+    searchAddon.onDidChangeResults((results) => {
+      this.updateSearchDecorations(session, results);
+    });
+    
+    // Add to layout manager
+    this.layoutManager.addTerminal(id, wrapper);
+    
+    // Update tabs UI
+    this.updateTabsUI();
     
     // Connect to PTY
     await this.connectTerminal(session, shouldRestore);
     
-    // Make active
-    this.switchToTerminal(id);
+    // Focus terminal only if it's the active one
+    if (id === this.activeTerminalId) {
+      terminal.focus();
+    }
     
     // Hide loading screen
     const loading = document.getElementById('loading');
@@ -356,6 +441,9 @@ export class ZeamiTermManager {
           cwd: result.cwd
         };
         
+        // Update session's cwd
+        session.cwd = result.cwd;
+        
         // Set PTY handler for user input
         session.terminal.setPtyHandler((data) => {
           console.log(`[Renderer] Sending user input to PTY: ${JSON.stringify(data)}`);
@@ -422,7 +510,7 @@ export class ZeamiTermManager {
             clearTimeout(session.autoSaveTimer);
           }
           session.autoSaveTimer = setTimeout(() => {
-            this.sessionPersistence.saveSession(id, session.terminal, session.process);
+            this.sessionPersistence.saveSession(terminalId, session.terminal, session.process);
           }, 5000); // Save 5 seconds after last input
         });
       }
@@ -458,47 +546,21 @@ export class ZeamiTermManager {
     terminal.writeln('');
   }
   
+  // Legacy tab methods - now handled by LayoutManager
   addTab(session) {
-    const tabsContainer = document.getElementById('tabs-container');
-    const tab = document.createElement('div');
-    tab.className = 'tab';
-    tab.id = `tab-${session.id}`;
-    tab.innerHTML = `
-      <span class="tab-title">${session.title}</span>
-      <span class="tab-close" data-terminal-id="${session.id}">×</span>
-    `;
-    
-    tab.addEventListener('click', (e) => {
-      if (e.target.classList.contains('tab-close')) {
-        e.stopPropagation();
-        this.closeTerminal(session.id);
-      } else {
-        this.switchToTerminal(session.id);
-      }
-    });
-    
-    tabsContainer.appendChild(tab);
+    // Deprecated - handled by LayoutManager
+    console.warn('[ZeamiTermManager] addTab is deprecated, use LayoutManager');
   }
   
   switchToTerminal(id) {
-    // Hide all terminals
-    this.terminals.forEach((session, terminalId) => {
-      const wrapper = document.getElementById(`wrapper-${terminalId}`);
-      const tab = document.getElementById(`tab-${terminalId}`);
-      
-      if (wrapper) wrapper.classList.remove('active');
-      if (tab) tab.classList.remove('active');
-    });
-    
-    // Show selected terminal
+    // Deprecated - handled by LayoutManager
+    console.warn('[ZeamiTermManager] switchToTerminal is deprecated, use LayoutManager');
+    this.focusTerminal(id);
+  }
+  
+  focusTerminal(id) {
     const session = this.terminals.get(id);
     if (session) {
-      const wrapper = document.getElementById(`wrapper-${id}`);
-      const tab = document.getElementById(`tab-${id}`);
-      
-      if (wrapper) wrapper.classList.add('active');
-      if (tab) tab.classList.add('active');
-      
       this.activeTerminalId = id;
       session.terminal.focus();
       
@@ -530,11 +592,8 @@ export class ZeamiTermManager {
       }
     }
     
-    // Remove UI elements
-    const wrapper = document.getElementById(`wrapper-${id}`);
-    const tab = document.getElementById(`tab-${id}`);
-    if (wrapper) wrapper.remove();
-    if (tab) tab.remove();
+    // Remove from layout manager
+    this.layoutManager.removeTerminal(id);
     
     // Dispose terminal
     session.terminal.dispose();
@@ -1086,5 +1145,68 @@ export class ZeamiTermManager {
     
     // Load profiles
     this.profileSelector.update();
+  }
+  
+  updateTabsUI() {
+    const tabsContainer = document.getElementById('tabs-container');
+    if (!tabsContainer) return;
+    
+    // Clear existing tabs
+    tabsContainer.innerHTML = '';
+    
+    // Create tabs for each terminal
+    this.terminals.forEach((session, id) => {
+      const tab = document.createElement('div');
+      tab.className = 'tab';
+      tab.id = `tab-${id}`;
+      
+      // Add active class to active terminal
+      if (id === this.activeTerminalId) {
+        tab.classList.add('active');
+      }
+      
+      // Tab content
+      tab.innerHTML = `
+        <span class="tab-title">${session.title || 'Terminal'}</span>
+        <span class="tab-close" data-terminal-id="${id}">×</span>
+      `;
+      
+      // Click handler for tab
+      tab.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('tab-close')) {
+          this.switchToTerminal(id);
+          this.updateTabsUI();
+        }
+      });
+      
+      // Click handler for close button
+      const closeBtn = tab.querySelector('.tab-close');
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeTerminal(id);
+      });
+      
+      tabsContainer.appendChild(tab);
+    });
+  }
+  
+  switchToTerminal(id) {
+    if (!this.terminals.has(id)) return;
+    
+    this.activeTerminalId = id;
+    
+    // Update layout manager
+    if (this.layoutManager && this.layoutManager.mode === 'tab') {
+      this.layoutManager.updateLayout();
+    }
+    
+    // Focus the terminal
+    const session = this.terminals.get(id);
+    if (session && session.terminal) {
+      session.terminal.focus();
+    }
+    
+    // Update tabs UI
+    this.updateTabsUI();
   }
 }

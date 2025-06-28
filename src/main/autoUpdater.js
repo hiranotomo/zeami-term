@@ -12,7 +12,7 @@ class AutoUpdaterManager {
     this.mainWindow = null;
     this.updateAvailable = false;
     this.downloadProgress = 0;
-    this.isEnabled = false; // Temporarily disabled for release
+    this.isEnabled = false; // Will be enabled after checkIfEnabled()
     
     // Configure logger
     log.transports.file.level = 'info';
@@ -22,13 +22,14 @@ class AutoUpdaterManager {
     this.checkIfEnabled();
     
     if (this.isEnabled) {
-      // Configure for GitHub releases
-      // electron-updater should automatically handle public releases from private repos
+      // Configure for GitHub releases from private repository
+      // GitHub allows public releases even from private repos
       autoUpdater.setFeedURL({
         provider: 'github',
         owner: 'hiranotomo',
-        repo: 'zeami-term'
-        // Don't specify 'private' - let electron-updater auto-detect
+        repo: 'zeami-term',
+        // No token needed for public releases
+        // Auto-updater will fetch from: https://github.com/hiranotomo/zeami-term/releases
       });
       
       // Disable auto download - we'll control when to download
@@ -41,9 +42,12 @@ class AutoUpdaterManager {
   
   
   checkIfEnabled() {
-    // Temporarily disabled for this release
-    log.info('Auto-update temporarily disabled');
-    return;
+    // Enable auto-update for production builds
+    if (app.isPackaged) {
+      this.isEnabled = true;
+      log.info('Auto-update enabled for packaged app');
+      return;
+    }
     
     // Don't enable in development
     if (process.env.NODE_ENV === 'development') {
@@ -164,28 +168,51 @@ class AutoUpdaterManager {
       return;
     }
     
+    // Force check in development with UPDATE_TEST environment variable
+    if (process.env.UPDATE_TEST === 'true') {
+      log.info('Force checking for updates in development mode');
+      autoUpdater.autoDownload = false;
+      autoUpdater.forceDevUpdateConfig = true;
+    }
+    
     autoUpdater.checkForUpdates().catch(err => {
       log.error('Failed to check for updates:', err);
     });
   }
   
   checkForUpdatesManually() {
-    if (!this.isEnabled) {
+    if (!this.isEnabled && process.env.UPDATE_TEST !== 'true') {
       dialog.showMessageBox(this.mainWindow, {
         type: 'info',
         title: 'アップデート機能',
-        message: 'アップデート機能は一時的に無効になっています。',
-        detail: '次のリリースで再度有効になります。',
+        message: '開発環境では自動アップデートは無効です。',
+        detail: 'ビルドされたアプリケーションでのみ動作します。',
         buttons: ['OK']
       });
       return;
     }
     
+    // Force enable for testing
+    if (process.env.UPDATE_TEST === 'true') {
+      log.info('Force checking for updates in test mode');
+      this.isEnabled = true;
+      autoUpdater.forceDevUpdateConfig = true;
+    }
+    
     autoUpdater.checkForUpdates().catch(err => {
       log.error('Manual update check failed:', err);
+      
+      // More informative error messages
+      let errorDetail = err.message;
+      if (err.message.includes('ENOTFOUND')) {
+        errorDetail = 'GitHubリポジトリが見つかりません。リポジトリが存在することを確認してください。';
+      } else if (err.message.includes('404')) {
+        errorDetail = 'リリースが見つかりません。GitHubでリリースを作成してください。';
+      }
+      
       dialog.showErrorBox(
         'アップデート確認エラー',
-        'アップデートの確認に失敗しました。\n' + err.message
+        'アップデートの確認に失敗しました。\n\n' + errorDetail
       );
     });
   }

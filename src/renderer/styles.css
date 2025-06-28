@@ -145,16 +145,29 @@ select {
 
 /* Terminal customization */
 .xterm {
-  padding: 5px;
+  padding: 0;
   height: 100%;
+  width: 100%;
 }
 
 .xterm-viewport {
   background-color: transparent !important;
+  overflow-y: hidden !important; /* Hide scrollbar */
+  overflow-x: hidden !important;
 }
 
 .xterm-screen {
   height: 100%;
+}
+
+/* Disable xterm scrollbar - we use the terminal's own scrolling */
+.xterm-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ensure terminal fits perfectly */
+.terminal-wrapper .xterm {
+  padding: 0 !important;
 }
 
 /* Selection styling managed by ThemeManager */
