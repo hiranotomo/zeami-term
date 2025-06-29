@@ -99,6 +99,40 @@ ZeamiTermは、Claude Codeとの対話を強化するElectronベースのター�
 - [開発ドキュメント](/docs/development/)
 - [包括的改善記録](/docs/ZEAMITERM_COMPREHENSIVE_IMPROVEMENTS.md)
 
+## Apple公証の成功事例（2025-06-29）
+
+### 正しい認証情報
+- **Apple ID**: tomo@teleport.jp
+- **App-specific password**: jewh-mrqd-puzh-yzya
+- **Team ID**: CV92DCV37B
+
+### よくある間違い
+- ❌ **間違ったApple ID**: ceo@teleport.co.jp（使わない）
+- ❌ **別の間違ったID**: develop@teleport.jp（使わない）
+- ✅ **正しいApple ID**: tomo@teleport.jp（必ずこれを使用）
+
+### リリースプロセスの要点
+1. **.envファイルの設定**
+   ```
+   APPLE_ID=tomo@teleport.jp
+   APPLE_PASSWORD=jewh-mrqd-puzh-yzya
+   APPLE_TEAM_ID=CV92DCV37B
+   ```
+
+2. **一括リリースコマンド**
+   ```bash
+   npm run publish:mac
+   ```
+   このコマンドで以下が自動実行される：
+   - ビルド
+   - 署名
+   - Apple公証
+   - GitHubリリースへのアップロード
+
+### 参考ドキュメント
+- [Apple公証ガイド](/docs/development/apple-notarization-guide.md)
+- [リリースプロセス](/docs/development/release-process.md)
+
 ## Phase 3機能の実装状況（2025-06-28）
 
 ### ✅ 実装完了機能
@@ -125,7 +159,7 @@ ZeamiTermは、Claude Codeとの対話を強化するElectronベースのター�
 5. **Electronプロセス境界の重要性**: レンダラープロセスでの`process is not defined`エラーは設計ミス（2025-06-29）
 
 ## 更新履歴
-- 2025-06-29: Electronプロセス境界エラーと通知システムの問題を追加
+- 2025-06-29: Electronプロセス境界エラーと通知システムの問題を追加、Apple公証の成功事例を記録
 - 2025-01-21: タブ・スプリット機能実装、テスト戦略の教訓を追加
 - 2025-06-28: 初期化・PTY出力問題の解決、Phase 3機能実装、包括的テストの追加
 - 2025-06-27: コマンドシステムの問題と再設計計画を追加
