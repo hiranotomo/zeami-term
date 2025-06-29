@@ -28,6 +28,7 @@ export class ZeamiTermManager {
     this.preferenceWindow = new PreferenceWindow(this.preferenceManager);
     this.layoutManager = null; // Will be initialized after DOM is ready
     this.fixedTerminals = true; // Always have exactly 2 terminals
+    this.updateNotifier = null; // Will be initialized in init()
     
     // Bind methods
     this.createTerminal = this.createTerminal.bind(this);
@@ -53,8 +54,31 @@ export class ZeamiTermManager {
   async init() {
     console.log('[ZeamiTermManager] Initializing with clean architecture...');
     
-    // Make manager accessible globally for testing
+    // Make manager accessible globally for testing and addons
     window.zeamiTermManager = this;
+    window.terminalManager = this;  // For backward compatibility
+    
+    // Add test helpers for debugging
+    window.testNotification = (type = 'command') => {
+      console.log('[TEST] Testing notification type:', type);
+      this.testNotification(type);
+    };
+    
+    window.testLongCommand = () => {
+      console.log('[TEST] Simulating long command completion');
+      this.showCommandNotification({
+        command: 'sleep 10 && echo "Done"',
+        duration: 10000,
+        exitCode: 0,
+        isClaude: false
+      });
+    };
+    
+    // Initialize update notifier
+    if (window.UpdateNotifier) {
+      this.updateNotifier = new window.UpdateNotifier();
+      console.log('[ZeamiTermManager] Update notifier initialized');
+    }
     
     // Initialize layout manager
     const container = document.getElementById('terminal-container');
@@ -208,6 +232,10 @@ export class ZeamiTermManager {
     const searchAddon = new window.SearchAddon.SearchAddon();
     terminal.loadAddon(searchAddon);
     
+    // Enhanced link provider (先に定義)
+    const enhancedLinkProvider = new EnhancedLinkProvider();
+    terminal.loadAddon(enhancedLinkProvider);
+    
     // Shell integration addon
     const shellIntegrationAddon = new ShellIntegrationAddon();
     terminal.loadAddon(shellIntegrationAddon);
@@ -229,13 +257,12 @@ export class ZeamiTermManager {
       
       // Handle long command completion
       if (eventName === 'longCommandCompleted') {
+        console.log('[ZeamiTermManager] Long command completed, showing notification:', data);
         this.showCommandNotification(data);
+      } else {
+        console.log('[ZeamiTermManager] Received shell integration event:', eventName, data);
       }
     };
-    
-    // Enhanced link provider
-    const enhancedLinkProvider = new EnhancedLinkProvider();
-    terminal.loadAddon(enhancedLinkProvider);
     
     // Web links addon (for basic URL support)
     const webLinksAddon = new window.WebLinksAddon.WebLinksAddon();
@@ -567,13 +594,69 @@ export class ZeamiTermManager {
     session.terminal.writeln('\r\nRestore this session? Type "session restore ' + lastSession.id + '" to restore.\r\n');
   }
   
-  showWelcomeMessage(terminal) {
-    terminal.writeln('\x1b[1;36m╔══════════════════════════════════════════╗\x1b[0m');
-    terminal.writeln('\x1b[1;36m║     ZeamiTerm v0.1.2 - Clean Edition     ║\x1b[0m');
-    terminal.writeln('\x1b[1;36m╚══════════════════════════════════════════╝\x1b[0m');
-    terminal.writeln('');
-    terminal.writeln('Type \x1b[1;33mhelp\x1b[0m for available commands or \x1b[1;33m?\x1b[0m for menu.');
-    terminal.writeln('');
+  async showWelcomeMessage(terminal) {
+    // Get version from main process
+    let version = '0.1.3';
+    try {
+      if (window.electronAPI && window.electronAPI.getAppVersion) {
+        version = await window.electronAPI.getAppVersion();
+      }
+    } catch (error) {
+      console.warn('[ZeamiTermManager] Failed to get app version:', error);
+    }
+    
+    // ATARI-style retro startup animation
+    const logo = [
+      ' ______  ____   ____   _   _  _ ',
+      '|_   / |  __|  / _  | | \\/\\ |/ |',
+      ' /  /  | |_   | |_| | | |\\/\\| |',
+      '/_____||____|  \\____| |_|    |_|'
+    ];
+    
+    const lines = [
+      '',
+      '\x1b[1;32m' + '█'.repeat(40) + '\x1b[0m',
+      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
+    ];
+    
+    // Add logo lines with centering
+    logo.forEach(line => {
+      const padding = Math.floor((38 - line.length) / 2);
+      lines.push('\x1b[1;32m█\x1b[1;33m' + ' '.repeat(padding) + line + ' '.repeat(38 - padding - line.length) + '\x1b[1;32m█\x1b[0m');
+    });
+    
+    lines.push(
+      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
+      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
+      `\x1b[1;32m█\x1b[1;33m       T E R M I N A L   v.${version}` + ' '.repeat(38 - 24 - version.length) + '\x1b[1;32m█\x1b[0m',
+      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
+      '\x1b[1;32m█\x1b[2;37m    (C) 2025 TELEPORT COMPANY, LTD.' + ' '.repeat(3) + '\x1b[1;32m█\x1b[0m',
+      '\x1b[1;32m█\x1b[2;37m        ALL RIGHTS RESERVED' + ' '.repeat(11) + '\x1b[1;32m█\x1b[0m',
+      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
+      '\x1b[1;32m' + '█'.repeat(40) + '\x1b[0m',
+      ''
+    );
+    
+    // Animate each line with a slight delay
+    lines.forEach((line, index) => {
+      setTimeout(() => {
+        terminal.writeln(line);
+        
+        // Add blinking cursor effect on the last line
+        if (index === lines.length - 1) {
+          setTimeout(() => {
+            terminal.writeln('\x1b[5;32m█\x1b[0m');
+            
+            // Clear and show the prompt after animation
+            setTimeout(() => {
+              terminal.write('\r\x1b[K'); // Clear the blinking cursor
+              terminal.writeln('Type \x1b[1;33mhelp\x1b[0m for available commands or \x1b[1;33m?\x1b[0m for menu.');
+              terminal.writeln('');
+            }, 800);
+          }, 200);
+        }
+      }, index * 60); // 60ms delay between lines
+    });
   }
   
   // Legacy tab methods - now handled by LayoutManager
@@ -1335,13 +1418,31 @@ export class ZeamiTermManager {
   }
   
   showCommandNotification(data) {
+    console.log('[ZeamiTermManager] showCommandNotification called with:', data);
+    
     const prefs = this.preferenceManager;
     
+    // Log current preferences for debugging
+    console.log('[ZeamiTermManager] Current notification preferences:', {
+      enabled: prefs.get('notifications.enabled'),
+      soundsEnabled: prefs.get('notifications.sounds.enabled'),
+      commandSound: prefs.get('notifications.types.command.sound'),
+      errorSound: prefs.get('notifications.types.error.sound'),
+      buildSound: prefs.get('notifications.types.buildSuccess.sound'),
+      claudeSound: prefs.get('notifications.claudeCode.sound')
+    });
+    
     // Check if notifications are enabled
-    if (!prefs.get('notifications.enabled')) return;
+    if (!prefs.get('notifications.enabled')) {
+      console.log('[ZeamiTermManager] Notifications are disabled');
+      return;
+    }
     
     // Check if window is focused
-    if (document.hasFocus() && prefs.get('notifications.onlyWhenUnfocused')) return;
+    if (document.hasFocus() && prefs.get('notifications.onlyWhenUnfocused')) {
+      console.log('[ZeamiTermManager] Window is focused and onlyWhenUnfocused is true');
+      return;
+    }
     
     // Determine notification type
     let notificationType = 'NORMAL';
@@ -1353,39 +1454,50 @@ export class ZeamiTermManager {
     } else if (data.exitCode !== 0) {
       notificationType = 'ERROR';
       sound = prefs.get('notifications.types.error.sound');
-    } else if (this.detectBuildSuccess(data.command)) {
+    } else if (data.command && this.detectBuildSuccess(data.command)) {
       notificationType = 'BUILD_SUCCESS';
       sound = prefs.get('notifications.types.buildSuccess.sound');
     }
+    
+    console.log(`[ZeamiTermManager] Notification type: ${notificationType}, sound: ${sound}`);
     
     const config = this.notificationTypes[notificationType];
     
     // Prepare notification
     const title = config.title;
-    const body = `"${data.command}" が完了しました（${this.formatDuration(data.duration)}）`;
+    const body = `"${data.command || 'コマンド'}" が完了しました（${this.formatDuration(data.duration)}）`;
     
-    // Show notification
+    // Show notification using Electron API for proper sound support
     try {
-      const notification = new Notification(title, {
-        body,
-        icon: '../../../assets/icon.png',
-        silent: !prefs.get('notifications.sounds.enabled') || sound === 'none',
-        // macOS specific sound
-        ...(window.electronAPI.platform === 'darwin' && sound && sound !== 'none' ? { sound } : {})
-      });
-      
-      // Click handler - focus window
-      notification.onclick = () => {
-        window.focus();
-        const session = this.terminals.get(this.activeTerminalId);
-        if (session && session.terminal) {
-          session.terminal.focus();
-        }
-      };
-      
-      // Auto close after 5 seconds
-      setTimeout(() => notification.close(), 5000);
-      
+      if (window.electronAPI && window.electronAPI.showNotification) {
+        console.log('[ZeamiTermManager] Using Electron notification API');
+        // Use Electron notification for sound support
+        window.electronAPI.showNotification({
+          title,
+          body,
+          sound: sound && sound !== 'none' ? sound : null,
+          silent: !prefs.get('notifications.sounds.enabled') || sound === 'none'
+        });
+      } else {
+        // Fallback to web notification
+        const notification = new Notification(title, {
+          body,
+          icon: '../../../assets/icon.png',
+          silent: !prefs.get('notifications.sounds.enabled') || sound === 'none'
+        });
+        
+        // Click handler - focus window
+        notification.onclick = () => {
+          window.focus();
+          const session = this.terminals.get(this.activeTerminalId);
+          if (session && session.terminal) {
+            session.terminal.focus();
+          }
+        };
+        
+        // Auto close after 5 seconds
+        setTimeout(() => notification.close(), 5000);
+      }
     } catch (error) {
       console.error('[ZeamiTermManager] Failed to show notification:', error);
     }
@@ -1465,28 +1577,45 @@ export class ZeamiTermManager {
       return;
     }
     
-    // Show test notification
+    // Show test notification using Electron API for proper sound support
     try {
-      const notification = new Notification(config.title + ' (テスト)', {
-        body: `"${testData.command}" が完了しました（${this.formatDuration(testData.duration)}）`,
-        icon: '../../../assets/icon.png',
-        silent: !prefs.get('notifications.sounds.enabled') || sound === 'none',
-        // macOS specific sound
-        ...(window.electronAPI.platform === 'darwin' && sound && sound !== 'none' ? { sound } : {})
+      if (window.electronAPI && window.electronAPI.showNotification) {
+        // Use Electron notification for sound support
+        window.electronAPI.showNotification({
+          title: config.title + ' (テスト)',
+          body: `"${testData.command}" が完了しました（${this.formatDuration(testData.duration)}）`,
+          sound: sound && sound !== 'none' ? sound : null,
+          silent: !prefs.get('notifications.sounds.enabled') || sound === 'none'
+        });
+      } else {
+        // Fallback to web notification
+        const notification = new Notification(config.title + ' (テスト)', {
+          body: `"${testData.command}" が完了しました（${this.formatDuration(testData.duration)}）`,
+          icon: '../../../assets/icon.png',
+          silent: !prefs.get('notifications.sounds.enabled') || sound === 'none'
+        });
+        
+        // Auto-close after 5 seconds
+        setTimeout(() => {
+          notification.close();
+        }, 5000);
+        
+        // Click handler - focus window
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+      }
+      
+      console.log(`[ZeamiTermManager] Test notification shown: ${type}, sound: ${sound}`);
+      console.log(`[ZeamiTermManager] Notification preferences:`, {
+        enabled: prefs.get('notifications.enabled'),
+        soundsEnabled: prefs.get('notifications.sounds.enabled'),
+        commandSound: prefs.get('notifications.types.command.sound'),
+        errorSound: prefs.get('notifications.types.error.sound'),
+        buildSound: prefs.get('notifications.types.buildSuccess.sound'),
+        claudeSound: prefs.get('notifications.claudeCode.sound')
       });
-      
-      // Auto-close after 5 seconds
-      setTimeout(() => {
-        notification.close();
-      }, 5000);
-      
-      // Click handler - focus window
-      notification.onclick = () => {
-        window.focus();
-        notification.close();
-      };
-      
-      console.log(`[ZeamiTermManager] Test notification shown: ${type}`);
     } catch (error) {
       console.error('[ZeamiTermManager] Failed to show test notification:', error);
       alert('通知の表示に失敗しました。システム設定で通知が許可されているか確認してください。');

@@ -123,6 +123,27 @@ npm run build:linux # Linux
 
 詳細は [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) を参照してください。
 
+## 自動アップデート機能
+
+ZeamiTermは以下のタイミングで自動的にアップデートをチェックします：
+- アプリ起動時（5秒後）
+- 2時間ごとの定期チェック
+
+### アップデートの流れ
+1. 新しいバージョンが見つかると通知ダイアログが表示されます
+2. 「ダウンロード」を選択すると、バックグラウンドでダウンロードが開始されます
+3. ダウンロード進捗はタスクバー/Dockに表示されます
+4. ダウンロード完了後、再起動してアップデートを適用できます
+
+### 開発環境でのテスト
+開発環境でアップデート機能をテストするには：
+```bash
+UPDATE_TEST=true npm run dev
+```
+
+### 手動チェック
+メニューの「ヘルプ」→「アップデートを確認...」からいつでも手動でチェックできます。
+
 ## Troubleshooting
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.

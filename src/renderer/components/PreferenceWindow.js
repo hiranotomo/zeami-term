@@ -25,6 +25,25 @@ export class PreferenceWindow {
       { id: 'advanced', name: 'Advanced', icon: '⚙️' }
     ];
     
+    // macOS notification sounds
+    this.macOSSounds = [
+      { value: 'Basso', label: 'Basso（低音）' },
+      { value: 'Blow', label: 'Blow（吹く音）' },
+      { value: 'Bottle', label: 'Bottle（瓶）' },
+      { value: 'Frog', label: 'Frog（蛙）' },
+      { value: 'Funk', label: 'Funk（ファンク）' },
+      { value: 'Glass', label: 'Glass（ガラス）' },
+      { value: 'Hero', label: 'Hero（ヒーロー）' },
+      { value: 'Morse', label: 'Morse（モールス）' },
+      { value: 'Ping', label: 'Ping（ピン）' },
+      { value: 'Pop', label: 'Pop（ポップ）' },
+      { value: 'Purr', label: 'Purr（猫の鳴き声）' },
+      { value: 'Sosumi', label: 'Sosumi（そう済み）' },
+      { value: 'Submarine', label: 'Submarine（潜水艦）' },
+      { value: 'Tink', label: 'Tink（チン）' },
+      { value: 'none', label: '無音' }
+    ];
+    
     // Theme presets
     this.themePresets = {
       'VS Code Dark': {
@@ -673,6 +692,12 @@ export class PreferenceWindow {
     `;
   }
 
+  renderSoundOptions(selectedValue) {
+    return this.macOSSounds.map(sound => 
+      `<option value="${sound.value}" ${selectedValue === sound.value ? 'selected' : ''}>${sound.label}</option>`
+    ).join('');
+  }
+  
   renderNotificationsPanel() {
     const prefs = this.preferenceManager.getSection('notifications');
     return `
@@ -736,21 +761,17 @@ export class PreferenceWindow {
             Claude Code実行を特別扱い
           </label>
         </div>
-        ${window.electronAPI.platform === 'darwin' ? `
+        ${(window.electronAPI?.platform || 'unknown') === 'darwin' ? `
         <div class="preference-field">
           <label class="preference-label">Claude Code通知音</label>
           <select class="preference-select" data-pref="notifications.claudeCode.sound">
-            <option value="Glass" ${prefs.claudeCode.sound === 'Glass' ? 'selected' : ''}>Glass（デフォルト）</option>
-            <option value="Ping" ${prefs.claudeCode.sound === 'Ping' ? 'selected' : ''}>Ping（推奨）</option>
-            <option value="Hero" ${prefs.claudeCode.sound === 'Hero' ? 'selected' : ''}>Hero</option>
-            <option value="Tink" ${prefs.claudeCode.sound === 'Tink' ? 'selected' : ''}>Tink</option>
-            <option value="none" ${prefs.claudeCode.sound === 'none' ? 'selected' : ''}>無音</option>
+            ${this.renderSoundOptions(prefs.claudeCode.sound)}
           </select>
         </div>
         ` : ''}
       </div>
       
-      ${window.electronAPI.platform === 'darwin' ? `
+      ${(window.electronAPI?.platform || 'unknown') === 'darwin' ? `
       <div class="preference-group">
         <h3>通知タイプ別設定</h3>
         <div class="preference-field">
@@ -761,10 +782,7 @@ export class PreferenceWindow {
             コマンド完了
           </label>
           <select class="preference-select" style="margin-left: 10px" data-pref="notifications.types.command.sound">
-            <option value="Glass" ${prefs.types.command.sound === 'Glass' ? 'selected' : ''}>Glass</option>
-            <option value="Tink" ${prefs.types.command.sound === 'Tink' ? 'selected' : ''}>Tink</option>
-            <option value="Pop" ${prefs.types.command.sound === 'Pop' ? 'selected' : ''}>Pop</option>
-            <option value="none" ${prefs.types.command.sound === 'none' ? 'selected' : ''}>無音</option>
+            ${this.renderSoundOptions(prefs.types.command.sound)}
           </select>
         </div>
         <div class="preference-field">
@@ -775,10 +793,7 @@ export class PreferenceWindow {
             エラー検出
           </label>
           <select class="preference-select" style="margin-left: 10px" data-pref="notifications.types.error.sound">
-            <option value="Basso" ${prefs.types.error.sound === 'Basso' ? 'selected' : ''}>Basso（警告音）</option>
-            <option value="Funk" ${prefs.types.error.sound === 'Funk' ? 'selected' : ''}>Funk</option>
-            <option value="Sosumi" ${prefs.types.error.sound === 'Sosumi' ? 'selected' : ''}>Sosumi</option>
-            <option value="none" ${prefs.types.error.sound === 'none' ? 'selected' : ''}>無音</option>
+            ${this.renderSoundOptions(prefs.types.error.sound)}
           </select>
         </div>
         <div class="preference-field">
@@ -789,10 +804,7 @@ export class PreferenceWindow {
             ビルド成功
           </label>
           <select class="preference-select" style="margin-left: 10px" data-pref="notifications.types.buildSuccess.sound">
-            <option value="Hero" ${prefs.types.buildSuccess.sound === 'Hero' ? 'selected' : ''}>Hero（目立つ音）</option>
-            <option value="Submarine" ${prefs.types.buildSuccess.sound === 'Submarine' ? 'selected' : ''}>Submarine</option>
-            <option value="Glass" ${prefs.types.buildSuccess.sound === 'Glass' ? 'selected' : ''}>Glass</option>
-            <option value="none" ${prefs.types.buildSuccess.sound === 'none' ? 'selected' : ''}>無音</option>
+            ${this.renderSoundOptions(prefs.types.buildSuccess.sound)}
           </select>
         </div>
       </div>
@@ -802,16 +814,16 @@ export class PreferenceWindow {
         <h3>通知テスト</h3>
         <p class="preference-label-hint">各種通知をテストして、設定が正しく動作するか確認できます</p>
         <div class="preference-test-buttons">
-          <button class="preference-button" onclick="window.terminalManager.testNotification('command')">
+          <button class="preference-button" onclick="(window.zeamiTermManager || window.terminalManager).testNotification('command')">
             <span class="button-icon">✅</span> コマンド完了
           </button>
-          <button class="preference-button" onclick="window.terminalManager.testNotification('error')">
+          <button class="preference-button" onclick="(window.zeamiTermManager || window.terminalManager).testNotification('error')">
             <span class="button-icon">❌</span> エラー検出
           </button>
-          <button class="preference-button" onclick="window.terminalManager.testNotification('build')">
+          <button class="preference-button" onclick="(window.zeamiTermManager || window.terminalManager).testNotification('build')">
             <span class="button-icon">🚀</span> ビルド成功
           </button>
-          <button class="preference-button" onclick="window.terminalManager.testNotification('claude')">
+          <button class="preference-button" onclick="(window.zeamiTermManager || window.terminalManager).testNotification('claude')">
             <span class="button-icon">✨</span> Claude Code完了
           </button>
         </div>
@@ -880,6 +892,26 @@ export class PreferenceWindow {
     const advanced = this.preferenceManager.getSection('advanced');
     return `
       <h2>Advanced Settings</h2>
+      
+      <div class="preference-group">
+        <h3>シェル統合</h3>
+        <div class="preference-field">
+          <label class="preference-label">
+            <input type="checkbox" class="preference-checkbox" 
+                   data-pref="advanced.shellIntegration.enabled" 
+                   ${advanced.shellIntegration?.enabled !== false ? 'checked' : ''}>
+            シェル統合を自動的に有効化
+          </label>
+          <p class="preference-label-hint">ターミナル起動時にOSC 133シーケンスを自動注入し、通知機能を有効にします</p>
+        </div>
+        <div class="preference-field">
+          <label class="preference-label">注入遅延</label>
+          <input type="number" class="preference-input" 
+                 data-pref="advanced.shellIntegration.delay" 
+                 value="${advanced.shellIntegration?.delay || 500}" min="100" max="2000" step="100">
+          <span class="preference-slider-value">ms</span>
+        </div>
+      </div>
       
       <div class="preference-group">
         <h3>Logging</h3>
@@ -1058,12 +1090,32 @@ export class PreferenceWindow {
       value = parseFloat(input.value);
     } else if (input.tagName === 'TEXTAREA' && path === 'privacy.excludePatterns') {
       value = input.value.split('\n').filter(line => line.trim());
+    } else if (input.tagName === 'SELECT') {
+      value = input.value;
     } else {
       value = input.value;
     }
     
     // Track unsaved changes
     this.unsavedChanges[path] = value;
+    
+    console.log(`[PreferenceWindow] Input changed: ${path} = ${value} (type: ${input.tagName})`)
+    
+    // Apply notification sound changes immediately for better UX
+    if (path.includes('notifications.') && path.includes('.sound')) {
+      console.log(`[PreferenceWindow] Applying notification sound change immediately: ${path} = ${value}`);
+      this.preferenceManager.set(path, value);
+      // Keep track that this was already applied
+      delete this.unsavedChanges[path];
+      
+      // Update UI to show change is applied
+      if (input.parentElement) {
+        input.style.borderColor = '#007acc';
+        setTimeout(() => {
+          input.style.borderColor = '';
+        }, 500);
+      }
+    }
     
     // Update linked inputs (for color pickers)
     if (input.type === 'color' || (input.type === 'text' && input.previousElementSibling?.type === 'color')) {

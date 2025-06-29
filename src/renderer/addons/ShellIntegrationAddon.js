@@ -43,9 +43,19 @@ export class ShellIntegrationAddon {
    * Check if notification should be shown for completed command
    */
   _checkNotification(command) {
-    if (!command || !window.terminalManager) return;
+    console.log('[ShellIntegrationAddon] Checking notification for command:', command);
     
-    const manager = window.terminalManager;
+    if (!command) {
+      console.warn('[ShellIntegrationAddon] No command provided for notification check');
+      return;
+    }
+    
+    if (!window.zeamiTermManager) {
+      console.warn('[ShellIntegrationAddon] window.zeamiTermManager not found');
+      return;
+    }
+    
+    const manager = window.zeamiTermManager;
     const prefs = manager.preferenceManager;
     
     if (!prefs.get('notifications.enabled')) return;
@@ -67,14 +77,19 @@ export class ShellIntegrationAddon {
     }
     
     // Check if duration exceeds threshold
+    console.log(`[ShellIntegrationAddon] Duration: ${duration}ms, Threshold: ${threshold}ms`);
+    
     if (duration >= threshold) {
+      console.log('[ShellIntegrationAddon] Duration exceeds threshold, emitting notification event');
       // Emit notification event
       this._emitEvent('longCommandCompleted', {
-        command: command.command,
+        command: command.command || command.commandLine || 'Unknown command',
         duration,
         exitCode: command.exitCode,
         isClaude
       });
+    } else {
+      console.log('[ShellIntegrationAddon] Duration below threshold, no notification');
     }
   }
   
@@ -126,6 +141,8 @@ export class ShellIntegrationAddon {
     const parts = data.split(';');
     const type = parts[0];
     
+    console.log('[ShellIntegrationAddon] OSC 133 received:', type, 'data:', data);
+    
     switch (type) {
       case 'A': // Prompt start
         this._onPromptStart();
@@ -156,7 +173,11 @@ export class ShellIntegrationAddon {
     switch (key) {
       case 'CommandLine':
         if (this._currentCommand) {
+          this._currentCommand.command = value;  // Also set command
           this._currentCommand.commandLine = value;
+          console.log('[ShellIntegrationAddon] Command line updated from OSC 633:', value);
+        } else {
+          console.warn('[ShellIntegrationAddon] Received CommandLine but no current command');
         }
         break;
       case 'CommandTime':
@@ -202,9 +223,32 @@ export class ShellIntegrationAddon {
     const commandId = `cmd-${++this._commandIdCounter}`;
     const startLine = this._terminal.buffer.active.cursorY;
     
+    // Try to get the command from the previous line (where command was typed)
+    let commandText = '';
+    try {
+      const buffer = this._terminal.buffer.active;
+      // Look at the previous line where the command was typed
+      if (startLine > 0) {
+        const cmdLine = buffer.getLine(startLine - 1);
+        if (cmdLine) {
+          commandText = cmdLine.translateToString(true).trim();
+          // Remove prompt if present (simple heuristic)
+          const promptMatch = commandText.match(/(?:.*?[>$#%]\s+)(.+)$/);
+          if (promptMatch) {
+            commandText = promptMatch[1];
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[ShellIntegrationAddon] Failed to get command text:', e);
+    }
+    
+    console.log('[ShellIntegrationAddon] Command started:', commandText, 'at line:', startLine);
+    
     this._currentCommand = {
       id: commandId,
-      commandLine: '',
+      command: commandText,  // Set command text
+      commandLine: commandText,
       startLine: startLine,
       endLine: null,
       startTime: Date.now(),
@@ -222,6 +266,8 @@ export class ShellIntegrationAddon {
     
     // Emit event
     this._emitEvent('commandStart', this._currentCommand);
+    
+    console.log('[ShellIntegrationAddon] Current command initialized:', this._currentCommand);
     
   }
   
@@ -244,6 +290,8 @@ export class ShellIntegrationAddon {
     
     // Emit event
     this._emitEvent('commandEnd', this._currentCommand);
+    
+    console.log('[ShellIntegrationAddon] Command ended:', this._currentCommand);
     
     // Check if notification should be shown
     this._checkNotification(this._currentCommand);

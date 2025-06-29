@@ -354,6 +354,48 @@ function setupIpcHandlers() {
     }
   });
   
+  // App version handler
+  ipcMain.handle('app:getVersion', () => {
+    return app.getVersion();
+  });
+  
+  // Notification handler with sound support
+  ipcMain.handle('show-notification', async (event, options) => {
+    try {
+      const { Notification } = require('electron');
+      
+      // Create notification options
+      const notificationOptions = {
+        title: options.title,
+        body: options.body,
+        icon: path.join(__dirname, '../../assets/icon.png'),
+        silent: options.silent
+      };
+      
+      // Add sound for macOS
+      if (process.platform === 'darwin' && options.sound && !options.silent) {
+        notificationOptions.sound = options.sound;
+      }
+      
+      const notification = new Notification(notificationOptions);
+      
+      // Handle click event
+      notification.on('click', () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      });
+      
+      notification.show();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to show notification:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
   // Command tracking handlers
   ipcMain.handle('command:trackStart', async (event, { commandId, commandLine }) => {
     try {
@@ -634,9 +676,13 @@ app.whenReady().then(async () => {
   autoUpdaterManager = new AutoUpdaterManager();
   autoUpdaterManager.setMainWindow(mainWindow);
   
-  // Check for updates after 5 seconds
+  // Check for updates after 5 seconds (initial check)
   setTimeout(() => {
+    console.log('[Main] Performing initial update check');
     autoUpdaterManager.checkForUpdates();
+    
+    // Start periodic checks after the initial check
+    autoUpdaterManager.startPeriodicChecks();
   }, 5000);
   
   app.on('activate', () => {
@@ -666,6 +712,11 @@ app.on('window-all-closed', () => {
 app.on('before-quit', (event) => {
   // Prevent immediate quit to allow cleanup
   event.preventDefault();
+  
+  // Stop periodic update checks
+  if (autoUpdaterManager) {
+    autoUpdaterManager.stopPeriodicChecks();
+  }
   
   // Clean up PTY service
   cleanupPtyProcesses().then(() => {

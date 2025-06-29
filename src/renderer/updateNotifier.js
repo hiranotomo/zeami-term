@@ -114,7 +114,8 @@ class UpdateNotifier {
   
   setupEventListeners() {
     // Listen for update events from main process
-    window.electronAPI.onUpdateStatus((event, data) => {
+    if (window.electronAPI && window.electronAPI.onUpdateStatus) {
+      window.electronAPI.onUpdateStatus((event, data) => {
       switch (event) {
         case 'checking-for-update':
           this.showStatus('アップデートを確認中...');
@@ -140,7 +141,8 @@ class UpdateNotifier {
           this.showUpdateReady(data);
           break;
       }
-    });
+      });
+    }
   }
   
   show() {

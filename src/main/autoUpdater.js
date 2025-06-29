@@ -13,6 +13,8 @@ class AutoUpdaterManager {
     this.updateAvailable = false;
     this.downloadProgress = 0;
     this.isEnabled = false; // Will be enabled after checkIfEnabled()
+    this.checkInterval = null;
+    this.CHECK_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
     
     // Configure logger
     log.transports.file.level = 'info';
@@ -46,6 +48,13 @@ class AutoUpdaterManager {
     if (app.isPackaged) {
       this.isEnabled = true;
       log.info('Auto-update enabled for packaged app');
+      return;
+    }
+    
+    // Enable in development if UPDATE_TEST environment variable is set
+    if (process.env.UPDATE_TEST === 'true') {
+      this.isEnabled = true;
+      log.info('Auto-update enabled in development mode for testing');
       return;
     }
     
@@ -100,12 +109,17 @@ class AutoUpdaterManager {
          info.releaseNotes.toLowerCase().includes('vulnerability'));
       
       
-      // Show update available dialog
+      // Show update available dialog with release notes
+      let detail = 'ダウンロードしてインストールしますか？';
+      if (info.releaseNotes) {
+        detail = `更新内容:\n${info.releaseNotes}\n\nダウンロードしてインストールしますか？`;
+      }
+      
       const response = dialog.showMessageBoxSync(this.mainWindow, {
         type: 'info',
         title: 'アップデートが利用可能',
-        message: `新しいバージョン ${info.version} が利用可能です。現在のバージョンは ${autoUpdater.currentVersion} です。`,
-        detail: 'ダウンロードしてインストールしますか？',
+        message: `新しいバージョン ${info.version} が利用可能です。現在のバージョンは ${app.getVersion()} です。`,
+        detail: detail,
         buttons: ['ダウンロード', '後で'],
         defaultId: 0,
         cancelId: 1
@@ -133,12 +147,22 @@ class AutoUpdaterManager {
       this.downloadProgress = progressObj.percent;
       log.info('Download progress:', progressObj);
       this.sendStatusToWindow('download-progress', progressObj);
+      
+      // Update progress in main window if visible
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.setProgressBar(progressObj.percent / 100);
+      }
     });
     
     // Update downloaded
     autoUpdater.on('update-downloaded', (info) => {
       log.info('Update downloaded:', info);
       this.sendStatusToWindow('update-downloaded', info);
+      
+      // Clear progress bar
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.setProgressBar(-1);
+      }
       
       const response = dialog.showMessageBoxSync(this.mainWindow, {
         type: 'info',
@@ -223,6 +247,35 @@ class AutoUpdaterManager {
       updateAvailable: this.updateAvailable,
       downloadProgress: this.downloadProgress
     };
+  }
+  
+  startPeriodicChecks() {
+    if (!this.isEnabled) {
+      log.info('Auto-update is disabled, skipping periodic checks');
+      return;
+    }
+    
+    // Clear any existing interval
+    this.stopPeriodicChecks();
+    
+    log.info('Starting periodic update checks (every 2 hours)');
+    
+    // Set up periodic check
+    this.checkInterval = setInterval(() => {
+      log.info('Performing periodic update check');
+      this.checkForUpdates();
+    }, this.CHECK_INTERVAL);
+    
+    // Also save the interval ID for cleanup
+    this.checkInterval.unref(); // Don't keep the app running just for this timer
+  }
+  
+  stopPeriodicChecks() {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+      log.info('Stopped periodic update checks');
+    }
   }
 }
 

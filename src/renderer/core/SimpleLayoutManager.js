@@ -184,7 +184,11 @@ export class SimpleLayoutManager {
   createNewWindow() {
     console.log('[SimpleLayoutManager] Creating new window');
     // Send IPC message to main process to create new window
-    window.electronAPI.createNewWindow();
+    if (window.electronAPI && window.electronAPI.createNewWindow) {
+      window.electronAPI.createNewWindow();
+    } else {
+      console.warn('[SimpleLayoutManager] electronAPI.createNewWindow not available');
+    }
   }
   
   createSplitLayout() {

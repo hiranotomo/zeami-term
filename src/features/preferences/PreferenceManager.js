@@ -97,13 +97,13 @@ export class PreferenceManager {
       // Notification Settings
       notifications: {
         enabled: true,
-        longCommandThreshold: 20000, // 20 seconds
+        longCommandThreshold: 5000, // 5 seconds (temporarily lowered for testing)
         onlyWhenUnfocused: true,
         
         // Claude Code specific settings
         claudeCode: {
           enabled: true,
-          threshold: 10000, // 10 seconds for Claude
+          threshold: 3000, // 3 seconds for Claude (temporarily lowered for testing)
           sound: 'Ping',
           detectPattern: ['claude', 'Claude Code']
         },
@@ -174,6 +174,11 @@ export class PreferenceManager {
           sixelSupport: false,
           imageSupport: false,
           unicodeVersion: '11'
+        },
+        shellIntegration: {
+          enabled: true,  // 自動的にシェル統合を注入
+          delay: 500,     // 注入前の待機時間（ミリ秒）
+          clearAfterInject: true  // 注入後に画面をクリア
         }
       }
     };

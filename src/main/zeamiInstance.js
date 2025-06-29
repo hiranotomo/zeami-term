@@ -2,6 +2,7 @@ const { EventEmitter } = require('events');
 const { MessageRouter } = require('./messageRouter');
 const { PatternDetector } = require('./patternDetector');
 const { TerminalBackend } = require('./terminalBackend');
+const path = require('path');
 
 class ZeamiInstance extends EventEmitter {
   constructor(options) {
@@ -15,6 +16,8 @@ class ZeamiInstance extends EventEmitter {
     this.ptyProcess = null;
     this.messageRouter = new MessageRouter();
     this.patternDetector = new PatternDetector();
+    this.enableShellIntegration = options.enableShellIntegration !== false; // default true
+    this.shellIntegrationInjected = false;
     this.context = {
       currentDirectory: this.cwd,
       history: [],
@@ -67,6 +70,13 @@ class ZeamiInstance extends EventEmitter {
 
     // Start the terminal
     this.ptyProcess.spawn();
+    
+    // Inject shell integration after a short delay
+    if (this.enableShellIntegration) {
+      setTimeout(() => {
+        this.injectShellIntegration();
+      }, 500); // Wait for shell to initialize
+    }
   }
 
   write(data) {
@@ -111,6 +121,120 @@ class ZeamiInstance extends EventEmitter {
     if (this.ptyProcess) {
       this.ptyProcess.kill();
       this.ptyProcess = null;
+    }
+  }
+  
+  injectShellIntegration() {
+    if (this.shellIntegrationInjected || !this.ptyProcess) {
+      return;
+    }
+    
+    console.log('[ZeamiInstance] Injecting shell integration...');
+    
+    const shellName = path.basename(this.shell || process.env.SHELL || '/bin/bash');
+    const integration = this.getShellIntegrationCode(shellName);
+    
+    if (integration) {
+      // Clear any partial input first
+      this.ptyProcess.write('\x03'); // Ctrl+C
+      
+      // Write integration code
+      setTimeout(() => {
+        // Send each line separately to avoid issues with long commands
+        const lines = integration.split('\n').filter(line => line.trim());
+        lines.forEach((line, index) => {
+          setTimeout(() => {
+            this.ptyProcess.write(line + '\n');
+          }, index * 10); // Small delay between lines
+        });
+        
+        this.shellIntegrationInjected = true;
+        console.log('[ZeamiInstance] Shell integration injected for', shellName);
+        
+        // Clear the screen after injection
+        setTimeout(() => {
+          this.ptyProcess.write('clear\n');
+        }, lines.length * 10 + 100);
+      }, 100);
+    }
+  }
+  
+  getShellIntegrationCode(shellName) {
+    // Base integration code that should work for bash and zsh
+    const baseIntegration = [
+      '# ZeamiTerm Shell Integration (temporary)',
+      'if [[ ! "$PS1" =~ "OSC 133" ]]; then',
+      '  export ZEAMI_SHELL_INTEGRATED=1',
+      '  ',
+      '  # Add markers to prompt',
+      '  PS1="\\[\\033]133;A\\007\\]$PS1\\[\\033]133;B\\007\\]"',
+      '  ',
+      '  # Command execution hooks',
+      '  __zeami_preexec() {',
+      '    printf "\\033]133;C\\007"',
+      '  }',
+      '  ',
+      '  __zeami_precmd() {',
+      '    local exit_code=$?',
+      '    printf "\\033]133;D;%s\\007" "$exit_code"',
+      '    return $exit_code',
+      '  }'
+    ].join('\n');
+    
+    switch (shellName) {
+      case 'bash':
+        return baseIntegration + '\n' + [
+          '  # Bash-specific setup',
+          '  trap \'__zeami_preexec\' DEBUG',
+          '  PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }__zeami_precmd"',
+          'fi'
+        ].join('\n') + '\n';
+        
+      case 'zsh':
+        return baseIntegration + '\n' + [
+          '  # Zsh-specific setup',
+          '  preexec() { __zeami_preexec; }',
+          '  precmd() { __zeami_precmd; }',
+          'fi'
+        ].join('\n') + '\n';
+        
+      case 'fish':
+        // Fish has different syntax
+        return [
+          '# ZeamiTerm Shell Integration for Fish',
+          'if not set -q ZEAMI_SHELL_INTEGRATED',
+          '  set -x ZEAMI_SHELL_INTEGRATED 1',
+          '  ',
+          '  function fish_prompt --description \'Write out the prompt\'',
+          '    printf "\\033]133;A\\007"',
+          '    # Call the original prompt function if it exists',
+          '    if functions -q __fish_prompt_original',
+          '      __fish_prompt_original',
+          '    else',
+          '      echo -n (prompt_pwd) \'> \'',
+          '    end',
+          '    printf "\\033]133;B\\007"',
+          '  end',
+          '  ',
+          '  function __zeami_preexec --on-event fish_preexec',
+          '    printf "\\033]133;C\\007"',
+          '  end',
+          '  ',
+          '  function __zeami_postexec --on-event fish_postexec',
+          '    printf "\\033]133;D;%s\\007" $status',
+          '  end',
+          'end'
+        ].join('\n') + '\n';
+        
+      default:
+        // Try bash-style for unknown shells
+        console.log('[ZeamiInstance] Unknown shell:', shellName, '- trying bash-style integration');
+        return baseIntegration + '\n' + [
+          '  # Generic setup (bash-style)',
+          '  trap \'__zeami_preexec\' DEBUG 2>/dev/null || true',
+          '  PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }__zeami_precmd"',
+          'fi'
+        ].join('\n') + '\n';
     }
   }
 }

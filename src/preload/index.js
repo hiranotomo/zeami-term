@@ -1,9 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
+// Version is now passed from main process via IPC
 
 // Modern API for xterm.js integration
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Platform information
+  // Platform and app information
   platform: process.platform,
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   
   // Terminal management
   createTerminal: (options) => ipcRenderer.invoke('terminal:create', options),
@@ -96,7 +98,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Update dialog event
   onShowUpdateDialog: (callback) => {
     ipcRenderer.on('show-update-dialog', (event, updateInfo) => callback(updateInfo));
-  }
+  },
+  
+  // Show notification with sound
+  showNotification: (options) => ipcRenderer.invoke('show-notification', options)
 });
 
 // Legacy API for backward compatibility with existing code

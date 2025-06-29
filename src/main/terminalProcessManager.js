@@ -23,7 +23,9 @@ class TerminalProcessManager extends EventEmitter {
         cwd: options.cwd,
         env: {
           TERM: 'xterm-256color',
-          ZEAMI_TERM: 'true',
+          ZEAMI_TERM: '1',
+          TERM_PROGRAM: 'ZeamiTerm',
+          TERM_PROGRAM_VERSION: '0.1.0',
           ZEAMI_SHELL_INTEGRATION_PATH: require('path').join(__dirname, '../../shell-integration'),
           ...options.env
         }
@@ -36,7 +38,8 @@ class TerminalProcessManager extends EventEmitter {
       args: terminalOptions.args,
       cwd: terminalOptions.cwd,
       env: terminalOptions.env,
-      profile: terminalOptions.profile
+      profile: terminalOptions.profile,
+      enableShellIntegration: true  // デフォルトで有効
     });
 
     // Forward events
