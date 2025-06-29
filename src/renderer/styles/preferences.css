@@ -67,6 +67,7 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0; /* Important for flex child to allow overflow */
 }
 
 /* Sidebar */
@@ -104,16 +105,47 @@
   opacity: 0.8;
 }
 
+/* Panels container */
+.preference-panels {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-width: 0; /* Important for flex child */
+}
+
 /* Panel */
 .preference-panel {
-  flex: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   padding: 20px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: none;
 }
 
 .preference-panel.active {
   display: block;
+}
+
+/* Smooth scrolling for preference panels */
+.preference-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.preference-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.preference-panel::-webkit-scrollbar-thumb {
+  background: #464647;
+  border-radius: 4px;
+}
+
+.preference-panel::-webkit-scrollbar-thumb:hover {
+  background: #585858;
 }
 
 .preference-panel h2 {
@@ -271,6 +303,28 @@
 .preference-button.primary:hover {
   background: #0062a3;
   border-color: #0062a3;
+}
+
+/* Test buttons */
+.preference-test-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.preference-test-buttons .preference-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preference-test-buttons .preference-button:active {
+  transform: scale(0.98);
+}
+
+.button-icon {
+  font-size: 16px;
 }
 
 /* Theme Preview */

@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Modern API for xterm.js integration
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Platform information
+  platform: process.platform,
+  
   // Terminal management
   createTerminal: (options) => ipcRenderer.invoke('terminal:create', options),
   killTerminal: (id) => ipcRenderer.invoke('terminal:kill', { id }),

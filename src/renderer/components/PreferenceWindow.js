@@ -736,7 +736,7 @@ export class PreferenceWindow {
             Claude Code実行を特別扱い
           </label>
         </div>
-        ${process.platform === 'darwin' ? `
+        ${window.electronAPI.platform === 'darwin' ? `
         <div class="preference-field">
           <label class="preference-label">Claude Code通知音</label>
           <select class="preference-select" data-pref="notifications.claudeCode.sound">
@@ -750,7 +750,7 @@ export class PreferenceWindow {
         ` : ''}
       </div>
       
-      ${process.platform === 'darwin' ? `
+      ${window.electronAPI.platform === 'darwin' ? `
       <div class="preference-group">
         <h3>通知タイプ別設定</h3>
         <div class="preference-field">
@@ -797,6 +797,25 @@ export class PreferenceWindow {
         </div>
       </div>
       ` : ''}
+      
+      <div class="preference-group">
+        <h3>通知テスト</h3>
+        <p class="preference-label-hint">各種通知をテストして、設定が正しく動作するか確認できます</p>
+        <div class="preference-test-buttons">
+          <button class="preference-button" onclick="window.terminalManager.testNotification('command')">
+            <span class="button-icon">✅</span> コマンド完了
+          </button>
+          <button class="preference-button" onclick="window.terminalManager.testNotification('error')">
+            <span class="button-icon">❌</span> エラー検出
+          </button>
+          <button class="preference-button" onclick="window.terminalManager.testNotification('build')">
+            <span class="button-icon">🚀</span> ビルド成功
+          </button>
+          <button class="preference-button" onclick="window.terminalManager.testNotification('claude')">
+            <span class="button-icon">✨</span> Claude Code完了
+          </button>
+        </div>
+      </div>
     `;
   }
 

@@ -237,7 +237,12 @@
 
 .terminal-wrapper.inactive::before {
   background: rgba(0, 0, 0, 0.2);
-  pointer-events: auto;
+  pointer-events: none; /* Allow scrolling through the overlay */
+}
+
+/* Click handler for inactive terminals */
+.terminal-wrapper.inactive {
+  cursor: pointer;
 }
 
 /* Override absolute positioning when in split mode */

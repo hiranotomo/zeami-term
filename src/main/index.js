@@ -429,16 +429,6 @@ function createApplicationMenu() {
         { type: 'separator' },
         { 
           label: '現在のターミナルを保存', 
-          accelerator: isMac ? 'Cmd+S' : 'Ctrl+S', 
-          click: () => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('menu-action', 'save-terminal');
-            }
-          }
-        },
-        { type: 'separator' },
-        { 
-          label: '現在のターミナルを保存', 
           accelerator: isMac ? 'Cmd+S' : 'Ctrl+S',
           click: () => {
             const window = BrowserWindow.getFocusedWindow();

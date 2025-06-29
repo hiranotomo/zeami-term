@@ -73,6 +73,9 @@ export class ZeamiTermManager {
     // Setup keyboard shortcuts
     this.setupKeyboardShortcuts();
     
+    // Setup menu action handler
+    this.setupMenuActionHandler();
+    
     // Create exactly 2 fixed terminals
     await this.createTerminal({ name: 'Terminal A', id: 'terminal-a' });
     await this.createTerminal({ name: 'Terminal B', id: 'terminal-b' });
@@ -116,6 +119,15 @@ export class ZeamiTermManager {
     const wrapper = document.createElement('div');
     wrapper.className = 'terminal-wrapper';
     wrapper.id = `wrapper-${id}`;
+    
+    // Add click handler to activate terminal when clicking on inactive terminal
+    wrapper.addEventListener('click', (e) => {
+      // Only activate if the terminal is inactive and the click is not on a scrollbar
+      if (wrapper.classList.contains('inactive') && 
+          e.target === wrapper || e.target.classList.contains('xterm-viewport')) {
+        this.switchToTerminal(id);
+      }
+    });
     
     // Get preferences
     const terminalPrefs = this.preferenceManager.getSection('terminal');
@@ -733,6 +745,41 @@ export class ZeamiTermManager {
     });
   }
   
+  setupMenuActionHandler() {
+    // Listen for menu actions from main process
+    if (window.electronAPI && window.electronAPI.onMenuAction) {
+      window.electronAPI.onMenuAction((action) => {
+        console.log('[ZeamiTermManager] Received menu action:', action);
+        
+        switch(action) {
+          case 'save-terminal':
+            this.saveTerminalHistory();
+            break;
+          case 'preferences':
+            this.preferenceWindow.open();
+            break;
+          case 'find':
+            this.toggleSearch();
+            break;
+          default:
+            console.warn('[ZeamiTermManager] Unknown menu action:', action);
+        }
+      });
+    }
+  }
+  
+  async saveTerminalHistory() {
+    const activeTerminal = this.getActiveTerminal();
+    if (!activeTerminal) {
+      console.warn('[ZeamiTermManager] No active terminal to save');
+      return;
+    }
+    
+    // Use the SaveCommand execute method
+    const saveCommand = new SaveCommand();
+    await saveCommand.execute(activeTerminal, []);
+  }
+  
   getActiveSession() {
     return this.terminals.get(this.activeTerminalId);
   }
@@ -1324,7 +1371,7 @@ export class ZeamiTermManager {
         icon: '../../../assets/icon.png',
         silent: !prefs.get('notifications.sounds.enabled') || sound === 'none',
         // macOS specific sound
-        ...(process.platform === 'darwin' && sound && sound !== 'none' ? { sound } : {})
+        ...(window.electronAPI.platform === 'darwin' && sound && sound !== 'none' ? { sound } : {})
       });
       
       // Click handler - focus window
@@ -1365,6 +1412,85 @@ export class ZeamiTermManager {
       return `${minutes}分${remainingSeconds}秒`;
     }
     return `${seconds}秒`;
+  }
+  
+  testNotification(type) {
+    const prefs = this.preferenceManager;
+    
+    // Create test data based on type
+    let testData = {
+      command: '',
+      duration: 25000, // 25 seconds
+      exitCode: 0,
+      isClaude: false
+    };
+    
+    let notificationType = 'NORMAL';
+    let sound = '';
+    
+    switch(type) {
+      case 'command':
+        testData.command = 'npm run build';
+        notificationType = 'NORMAL';
+        sound = prefs.get('notifications.types.command.sound');
+        break;
+        
+      case 'error':
+        testData.command = 'npm test';
+        testData.exitCode = 1;
+        notificationType = 'ERROR';
+        sound = prefs.get('notifications.types.error.sound');
+        break;
+        
+      case 'build':
+        testData.command = 'webpack: compiled successfully';
+        notificationType = 'BUILD_SUCCESS';
+        sound = prefs.get('notifications.types.buildSuccess.sound');
+        break;
+        
+      case 'claude':
+        testData.command = 'claude --dangerously-skip-permissions';
+        testData.isClaude = true;
+        testData.duration = 12000; // 12 seconds
+        notificationType = 'CLAUDE';
+        sound = prefs.get('notifications.claudeCode.sound');
+        break;
+    }
+    
+    const config = this.notificationTypes[notificationType];
+    
+    // Check if notifications are enabled
+    if (!prefs.get('notifications.enabled')) {
+      alert('通知が無効になっています。設定で有効にしてください。');
+      return;
+    }
+    
+    // Show test notification
+    try {
+      const notification = new Notification(config.title + ' (テスト)', {
+        body: `"${testData.command}" が完了しました（${this.formatDuration(testData.duration)}）`,
+        icon: '../../../assets/icon.png',
+        silent: !prefs.get('notifications.sounds.enabled') || sound === 'none',
+        // macOS specific sound
+        ...(window.electronAPI.platform === 'darwin' && sound && sound !== 'none' ? { sound } : {})
+      });
+      
+      // Auto-close after 5 seconds
+      setTimeout(() => {
+        notification.close();
+      }, 5000);
+      
+      // Click handler - focus window
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+      
+      console.log(`[ZeamiTermManager] Test notification shown: ${type}`);
+    } catch (error) {
+      console.error('[ZeamiTermManager] Failed to show test notification:', error);
+      alert('通知の表示に失敗しました。システム設定で通知が許可されているか確認してください。');
+    }
   }
   
   switchToTerminal(id) {

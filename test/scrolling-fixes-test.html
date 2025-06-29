@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scrolling Fixes Test - ZeamiTerm</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #1e1e1e;
+      color: #cccccc;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    .test-section {
+      margin-bottom: 40px;
+      padding: 20px;
+      background: #252526;
+      border-radius: 8px;
+      border: 1px solid #3c3c3c;
+    }
+    
+    h1 {
+      color: #007acc;
+      margin-bottom: 30px;
+    }
+    
+    h2 {
+      color: #cccccc;
+      margin-bottom: 20px;
+    }
+    
+    .test-container {
+      border: 1px solid #464647;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    
+    .test-description {
+      background: #2d2d30;
+      padding: 15px;
+      border-bottom: 1px solid #464647;
+    }
+    
+    .test-result {
+      padding: 15px;
+      background: #1e1e1e;
+      min-height: 100px;
+    }
+    
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 3px;
+      font-size: 12px;
+      margin-right: 10px;
+    }
+    
+    .status.pending {
+      background: #666;
+      color: white;
+    }
+    
+    .status.pass {
+      background: #28a745;
+      color: white;
+    }
+    
+    .status.fail {
+      background: #dc3545;
+      color: white;
+    }
+    
+    .code {
+      background: #1e1e1e;
+      border: 1px solid #3c3c3c;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+      margin: 10px 0;
+      overflow-x: auto;
+    }
+    
+    .test-button {
+      background: #007acc;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+    
+    .test-button:hover {
+      background: #1e8ad6;
+    }
+    
+    .test-button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    
+    /* Mock preference window */
+    .mock-preference-window {
+      position: relative;
+      width: 600px;
+      height: 400px;
+      background: #252526;
+      border: 1px solid #3c3c3c;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      margin: 20px 0;
+    }
+    
+    .mock-preference-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+    
+    .mock-preference-panels {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      min-width: 0;
+    }
+    
+    .mock-preference-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 20px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: #1e1e1e;
+    }
+    
+    .mock-preference-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .mock-preference-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .mock-preference-panel::-webkit-scrollbar-thumb {
+      background: #464647;
+      border-radius: 4px;
+    }
+    
+    .mock-preference-panel::-webkit-scrollbar-thumb:hover {
+      background: #585858;
+    }
+    
+    /* Mock terminal */
+    .mock-terminals {
+      display: flex;
+      gap: 10px;
+      height: 300px;
+      margin: 20px 0;
+    }
+    
+    .mock-terminal-wrapper {
+      flex: 1;
+      position: relative;
+      background: #1e1e1e;
+      border: 1px solid #3c3c3c;
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: default;
+    }
+    
+    .mock-terminal-wrapper::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0);
+      pointer-events: none;
+      z-index: 100;
+      transition: background-color 0.2s ease;
+    }
+    
+    .mock-terminal-wrapper.inactive::before {
+      background: rgba(0, 0, 0, 0.2);
+      pointer-events: none;
+    }
+    
+    .mock-terminal-wrapper.inactive {
+      cursor: pointer;
+    }
+    
+    .mock-terminal-content {
+      padding: 20px;
+      height: 100%;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    
+    .terminal-label {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #007acc;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      z-index: 101;
+    }
+    
+    .inactive .terminal-label {
+      background: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔧 ZeamiTerm Scrolling Fixes Test</h1>
+  
+  <div class="test-section">
+    <h2>Test 1: Preference Window Scrolling</h2>
+    
+    <div class="test-container">
+      <div class="test-description">
+        <span class="status pending" id="pref-test-status">PENDING</span>
+        <strong>Test:</strong> Preference window content should be scrollable when it exceeds viewport height
+      </div>
+      <div class="test-result">
+        <p>The preference panel below should show a scrollbar and allow smooth scrolling through the content.</p>
+        
+        <div class="mock-preference-window">
+          <div class="mock-preference-content">
+            <div class="mock-preference-panels">
+              <div class="mock-preference-panel">
+                <h3>Mock Preference Content</h3>
+                <p>This is a test of the preference window scrolling functionality.</p>
+                <p>The content should be scrollable when it exceeds the container height.</p>
+                
+                <!-- Generate lots of content to force scrolling -->
+                <script>
+                  for (let i = 1; i <= 30; i++) {
+                    document.write(`<div style="margin: 10px 0; padding: 10px; background: #2d2d30; border-radius: 4px;">
+                      <strong>Setting ${i}:</strong> This is a mock preference setting that demonstrates scrolling behavior.
+                      When there are many settings, the panel should become scrollable.
+                    </div>`);
+                  }
+                </script>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <button class="test-button" onclick="testPreferenceScrolling()">Run Test</button>
+        <div id="pref-test-result"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Test 2: Inactive Terminal Scrolling</h2>
+    
+    <div class="test-container">
+      <div class="test-description">
+        <span class="status pending" id="terminal-test-status">PENDING</span>
+        <strong>Test:</strong> Inactive terminals should allow scrolling without activation
+      </div>
+      <div class="test-result">
+        <p>The terminals below demonstrate the scrolling behavior. Terminal A is active, Terminal B is inactive.</p>
+        <p>You should be able to:</p>
+        <ul>
+          <li>Scroll Terminal B (inactive) without it becoming active</li>
+          <li>Click on Terminal B to activate it</li>
+          <li>See the visual difference between active and inactive terminals</li>
+        </ul>
+        
+        <div class="mock-terminals">
+          <div class="mock-terminal-wrapper active" id="terminal-a">
+            <div class="terminal-label">Terminal A</div>
+            <div class="mock-terminal-content">
+              <script>
+                for (let i = 1; i <= 50; i++) {
+                  document.write(`<div>$ command-${i} --option value</div>`);
+                  document.write(`<div style="color: #0dbc79;">✓ Output from command ${i}</div>`);
+                }
+              </script>
+            </div>
+          </div>
+          
+          <div class="mock-terminal-wrapper inactive" id="terminal-b">
+            <div class="terminal-label">Terminal B</div>
+            <div class="mock-terminal-content">
+              <script>
+                for (let i = 1; i <= 50; i++) {
+                  document.write(`<div>$ another-command-${i}</div>`);
+                  document.write(`<div style="color: #cd3131;">✗ Error output ${i}</div>`);
+                }
+              </script>
+            </div>
+          </div>
+        </div>
+        
+        <button class="test-button" onclick="testTerminalScrolling()">Run Test</button>
+        <button class="test-button" onclick="resetTerminals()">Reset</button>
+        <div id="terminal-test-result"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="test-section">
+    <h2>CSS Changes Applied</h2>
+    <div class="code">
+/* Preference Window Fix */
+.preference-content {
+  min-height: 0; /* Important for flex child to allow overflow */
+}
+
+.preference-panels {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-width: 0;
+}
+
+.preference-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Terminal Scrolling Fix */
+.terminal-wrapper.inactive::before {
+  pointer-events: none; /* Allow scrolling through the overlay */
+}
+
+.terminal-wrapper.inactive {
+  cursor: pointer;
+}</div>
+  </div>
+  
+  <script>
+    // Test preference window scrolling
+    function testPreferenceScrolling() {
+      const panel = document.querySelector('.mock-preference-panel');
+      const status = document.getElementById('pref-test-status');
+      const result = document.getElementById('pref-test-result');
+      
+      if (panel.scrollHeight > panel.clientHeight) {
+        status.textContent = 'PASS';
+        status.className = 'status pass';
+        result.innerHTML = '<p style="color: #0dbc79;">✓ Panel is scrollable (scrollHeight: ' + 
+          panel.scrollHeight + 'px > clientHeight: ' + panel.clientHeight + 'px)</p>';
+      } else {
+        status.textContent = 'FAIL';
+        status.className = 'status fail';
+        result.innerHTML = '<p style="color: #cd3131;">✗ Panel is not scrollable</p>';
+      }
+    }
+    
+    // Test terminal scrolling and activation
+    function testTerminalScrolling() {
+      const terminalA = document.getElementById('terminal-a');
+      const terminalB = document.getElementById('terminal-b');
+      const status = document.getElementById('terminal-test-status');
+      const result = document.getElementById('terminal-test-result');
+      
+      let messages = [];
+      let hasErrors = false;
+      
+      // Check if terminal B is inactive
+      if (terminalB.classList.contains('inactive')) {
+        messages.push('✓ Terminal B is inactive');
+      } else {
+        messages.push('✗ Terminal B should be inactive');
+        hasErrors = true;
+      }
+      
+      // Check if terminal B content is scrollable
+      const content = terminalB.querySelector('.mock-terminal-content');
+      if (content.scrollHeight > content.clientHeight) {
+        messages.push('✓ Terminal B content is scrollable');
+      } else {
+        messages.push('✗ Terminal B content should be scrollable');
+        hasErrors = true;
+      }
+      
+      // Check pointer-events on overlay
+      const computedStyle = window.getComputedStyle(terminalB, '::before');
+      messages.push('ℹ️  Overlay pointer-events: ' + (computedStyle.pointerEvents || 'computed style not accessible'));
+      
+      if (!hasErrors) {
+        status.textContent = 'PASS';
+        status.className = 'status pass';
+      } else {
+        status.textContent = 'FAIL';
+        status.className = 'status fail';
+      }
+      
+      result.innerHTML = '<p>' + messages.join('<br>') + '</p>';
+    }
+    
+    // Terminal activation simulation
+    document.getElementById('terminal-b').addEventListener('click', function(e) {
+      if (this.classList.contains('inactive')) {
+        // Switch active terminal
+        document.getElementById('terminal-a').classList.remove('active');
+        document.getElementById('terminal-a').classList.add('inactive');
+        this.classList.remove('inactive');
+        this.classList.add('active');
+        
+        document.getElementById('terminal-test-result').innerHTML += 
+          '<p style="color: #0dbc79;">✓ Terminal B activated by click</p>';
+      }
+    });
+    
+    // Reset terminals
+    function resetTerminals() {
+      document.getElementById('terminal-a').classList.add('active');
+      document.getElementById('terminal-a').classList.remove('inactive');
+      document.getElementById('terminal-b').classList.add('inactive');
+      document.getElementById('terminal-b').classList.remove('active');
+      document.getElementById('terminal-test-result').innerHTML = '';
+    }
+    
+    // Run tests automatically on load
+    window.addEventListener('load', function() {
+      setTimeout(testPreferenceScrolling, 500);
+      setTimeout(testTerminalScrolling, 600);
+    });
+  </script>
+</body>
+</html>

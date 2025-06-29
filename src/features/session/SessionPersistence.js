@@ -40,7 +40,7 @@ export class SessionPersistence {
       metadata: {
         version: '1.0',
         terminalType: processInfo.shell || 'unknown',
-        platform: process.platform
+        platform: window.electronAPI?.platform || 'unknown'
       }
     };
 
