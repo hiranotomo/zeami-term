@@ -19,6 +19,7 @@ export class PreferenceWindow {
       { id: 'shell', name: 'Shell & Profiles', icon: '🐚' },
       { id: 'session', name: 'Session', icon: '💾' },
       { id: 'keyboard', name: 'Keyboard', icon: '⌨️' },
+      { id: 'notifications', name: 'Notifications', icon: '🔔' },
       // Window settings hidden from UI but kept in PreferenceManager
       // { id: 'window', name: 'Window', icon: '🪟' },
       { id: 'advanced', name: 'Advanced', icon: '⚙️' }
@@ -240,6 +241,8 @@ export class PreferenceWindow {
         return this.renderSessionPanel();
       case 'keyboard':
         return this.renderKeyboardPanel();
+      case 'notifications':
+        return this.renderNotificationsPanel();
       // Window panel hidden from UI
       // case 'window':
       //   return this.renderWindowPanel();
@@ -670,6 +673,133 @@ export class PreferenceWindow {
     `;
   }
 
+  renderNotificationsPanel() {
+    const prefs = this.preferenceManager.getSection('notifications');
+    return `
+      <h2>通知設定</h2>
+      
+      <div class="preference-group">
+        <h3>基本設定</h3>
+        <div class="preference-field">
+          <label class="preference-label">
+            <input type="checkbox" class="preference-checkbox" 
+                   data-pref="notifications.enabled" 
+                   ${prefs.enabled ? 'checked' : ''}>
+            長時間処理の完了を通知
+          </label>
+          <p class="preference-label-hint">コマンド実行が指定時間を超えた場合に通知します</p>
+        </div>
+        <div class="preference-field">
+          <label class="preference-label">
+            <input type="checkbox" class="preference-checkbox" 
+                   data-pref="notifications.onlyWhenUnfocused" 
+                   ${prefs.onlyWhenUnfocused ? 'checked' : ''}>
+            ウィンドウがフォーカスされていない時のみ通知
+          </label>
+        </div>
+        <div class="preference-field">
+          <label class="preference-label">
+            <input type="checkbox" class="preference-checkbox" 
+                   data-pref="notifications.sounds.enabled" 
+                   ${prefs.sounds.enabled ? 'checked' : ''}>
+            通知音を鳴らす
+          </label>
+        </div>
+      </div>
+      
+      <div class="preference-group">
+        <h3>通知閾値</h3>
+        <div class="preference-field">
+          <label class="preference-label">通常のコマンド</label>
+          <input type="number" class="preference-input" 
+                 data-pref="notifications.longCommandThreshold" 
+                 value="${prefs.longCommandThreshold / 1000}" min="5" max="300">
+          <span class="preference-slider-value">秒以上</span>
+        </div>
+        <div class="preference-field">
+          <label class="preference-label">Claude Code</label>
+          <input type="number" class="preference-input" 
+                 data-pref="notifications.claudeCode.threshold" 
+                 value="${prefs.claudeCode.threshold / 1000}" min="3" max="60">
+          <span class="preference-slider-value">秒以上</span>
+          <p class="preference-label-hint">Claude Codeコマンドは短い時間でも通知</p>
+        </div>
+      </div>
+      
+      <div class="preference-group">
+        <h3>Claude Code専用設定</h3>
+        <div class="preference-field">
+          <label class="preference-label">
+            <input type="checkbox" class="preference-checkbox" 
+                   data-pref="notifications.claudeCode.enabled" 
+                   ${prefs.claudeCode.enabled ? 'checked' : ''}>
+            Claude Code実行を特別扱い
+          </label>
+        </div>
+        ${process.platform === 'darwin' ? `
+        <div class="preference-field">
+          <label class="preference-label">Claude Code通知音</label>
+          <select class="preference-select" data-pref="notifications.claudeCode.sound">
+            <option value="Glass" ${prefs.claudeCode.sound === 'Glass' ? 'selected' : ''}>Glass（デフォルト）</option>
+            <option value="Ping" ${prefs.claudeCode.sound === 'Ping' ? 'selected' : ''}>Ping（推奨）</option>
+            <option value="Hero" ${prefs.claudeCode.sound === 'Hero' ? 'selected' : ''}>Hero</option>
+            <option value="Tink" ${prefs.claudeCode.sound === 'Tink' ? 'selected' : ''}>Tink</option>
+            <option value="none" ${prefs.claudeCode.sound === 'none' ? 'selected' : ''}>無音</option>
+          </select>
+        </div>
+        ` : ''}
+      </div>
+      
+      ${process.platform === 'darwin' ? `
+      <div class="preference-group">
+        <h3>通知タイプ別設定</h3>
+        <div class="preference-field">
+          <label class="preference-label">
+            <input type="checkbox" class="preference-checkbox" 
+                   data-pref="notifications.types.command.enabled" 
+                   ${prefs.types.command.enabled ? 'checked' : ''}>
+            コマンド完了
+          </label>
+          <select class="preference-select" style="margin-left: 10px" data-pref="notifications.types.command.sound">
+            <option value="Glass" ${prefs.types.command.sound === 'Glass' ? 'selected' : ''}>Glass</option>
+            <option value="Tink" ${prefs.types.command.sound === 'Tink' ? 'selected' : ''}>Tink</option>
+            <option value="Pop" ${prefs.types.command.sound === 'Pop' ? 'selected' : ''}>Pop</option>
+            <option value="none" ${prefs.types.command.sound === 'none' ? 'selected' : ''}>無音</option>
+          </select>
+        </div>
+        <div class="preference-field">
+          <label class="preference-label">
+            <input type="checkbox" class="preference-checkbox" 
+                   data-pref="notifications.types.error.enabled" 
+                   ${prefs.types.error.enabled ? 'checked' : ''}>
+            エラー検出
+          </label>
+          <select class="preference-select" style="margin-left: 10px" data-pref="notifications.types.error.sound">
+            <option value="Basso" ${prefs.types.error.sound === 'Basso' ? 'selected' : ''}>Basso（警告音）</option>
+            <option value="Funk" ${prefs.types.error.sound === 'Funk' ? 'selected' : ''}>Funk</option>
+            <option value="Sosumi" ${prefs.types.error.sound === 'Sosumi' ? 'selected' : ''}>Sosumi</option>
+            <option value="none" ${prefs.types.error.sound === 'none' ? 'selected' : ''}>無音</option>
+          </select>
+        </div>
+        <div class="preference-field">
+          <label class="preference-label">
+            <input type="checkbox" class="preference-checkbox" 
+                   data-pref="notifications.types.buildSuccess.enabled" 
+                   ${prefs.types.buildSuccess.enabled ? 'checked' : ''}>
+            ビルド成功
+          </label>
+          <select class="preference-select" style="margin-left: 10px" data-pref="notifications.types.buildSuccess.sound">
+            <option value="Hero" ${prefs.types.buildSuccess.sound === 'Hero' ? 'selected' : ''}>Hero（目立つ音）</option>
+            <option value="Submarine" ${prefs.types.buildSuccess.sound === 'Submarine' ? 'selected' : ''}>Submarine</option>
+            <option value="Glass" ${prefs.types.buildSuccess.sound === 'Glass' ? 'selected' : ''}>Glass</option>
+            <option value="none" ${prefs.types.buildSuccess.sound === 'none' ? 'selected' : ''}>無音</option>
+          </select>
+        </div>
+      </div>
+      ` : ''}
+    `;
+  }
+
 
   renderWindowPanel() {
     const window = this.preferenceManager.getSection('window');
@@ -898,6 +1028,11 @@ export class PreferenceWindow {
       
       // Special handling for session interval (convert seconds to ms)
       if (path === 'session.autoSaveInterval') {
+        value = value * 1000;
+      }
+      // Special handling for notification thresholds (convert seconds to ms)
+      if (path === 'notifications.longCommandThreshold' || 
+          path === 'notifications.claudeCode.threshold') {
         value = value * 1000;
       }
     } else if (input.type === 'range') {

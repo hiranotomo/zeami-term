@@ -39,6 +39,45 @@ export class ShellIntegrationAddon {
     console.log('[ShellIntegrationAddon] Activated');
   }
   
+  /**
+   * Check if notification should be shown for completed command
+   */
+  _checkNotification(command) {
+    if (!command || !window.terminalManager) return;
+    
+    const manager = window.terminalManager;
+    const prefs = manager.preferenceManager;
+    
+    if (!prefs.get('notifications.enabled')) return;
+    
+    // Calculate duration
+    const duration = command.endTime - command.startTime;
+    const commandText = command.command.toLowerCase();
+    
+    // Check if it's Claude Code
+    const claudePatterns = prefs.get('notifications.claudeCode.detectPattern') || [];
+    const isClaude = claudePatterns.some(pattern => 
+      commandText.includes(pattern.toLowerCase())
+    );
+    
+    // Determine threshold
+    let threshold = prefs.get('notifications.longCommandThreshold');
+    if (isClaude && prefs.get('notifications.claudeCode.enabled')) {
+      threshold = prefs.get('notifications.claudeCode.threshold');
+    }
+    
+    // Check if duration exceeds threshold
+    if (duration >= threshold) {
+      // Emit notification event
+      this._emitEvent('longCommandCompleted', {
+        command: command.command,
+        duration,
+        exitCode: command.exitCode,
+        isClaude
+      });
+    }
+  }
+  
   dispose() {
     // Clean up decorations
     this._decorations.forEach(decoration => decoration.dispose());
@@ -206,6 +245,8 @@ export class ShellIntegrationAddon {
     // Emit event
     this._emitEvent('commandEnd', this._currentCommand);
     
+    // Check if notification should be shown
+    this._checkNotification(this._currentCommand);
     
     this._currentCommand = null;
     this._isExecuting = false;

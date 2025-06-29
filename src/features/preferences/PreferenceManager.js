@@ -94,6 +94,43 @@ export class PreferenceManager {
         sessionDirectory: '~/.zeami-term/sessions'
       },
       
+      // Notification Settings
+      notifications: {
+        enabled: true,
+        longCommandThreshold: 20000, // 20 seconds
+        onlyWhenUnfocused: true,
+        
+        // Claude Code specific settings
+        claudeCode: {
+          enabled: true,
+          threshold: 10000, // 10 seconds for Claude
+          sound: 'Ping',
+          detectPattern: ['claude', 'Claude Code']
+        },
+        
+        // Notification types
+        types: {
+          command: {
+            enabled: true,
+            sound: 'Glass'
+          },
+          error: {
+            enabled: true,
+            sound: 'Basso'
+          },
+          buildSuccess: {
+            enabled: true,
+            sound: 'Hero'
+          }
+        },
+        
+        // Sound settings
+        sounds: {
+          enabled: true,
+          volume: 0.5
+        }
+      },
+      
       // Window Settings
       window: {
         transparent: false,

@@ -40,6 +40,14 @@ export class ZeamiTermManager {
     this.preferenceManager.on('*', (value, oldValue, path) => {
       this.onPreferenceChange(path, value, oldValue);
     });
+    
+    // Notification types mapping
+    this.notificationTypes = {
+      NORMAL: { title: '✅ コマンド完了', defaultSound: 'Glass' },
+      ERROR: { title: '❌ エラー検出', defaultSound: 'Basso' },
+      BUILD_SUCCESS: { title: '🚀 ビルド成功', defaultSound: 'Hero' },
+      CLAUDE: { title: '✨ Claude Code完了', defaultSound: 'Ping' }
+    };
   }
   
   async init() {
@@ -205,6 +213,11 @@ export class ZeamiTermManager {
       // Forward CWD changes to link provider
       if (eventName === 'cwdChange' && enhancedLinkProvider) {
         enhancedLinkProvider._cwd = data;
+      }
+      
+      // Handle long command completion
+      if (eventName === 'longCommandCompleted') {
+        this.showCommandNotification(data);
       }
     };
     
@@ -1272,6 +1285,86 @@ export class ZeamiTermManager {
       
       setTimeout(() => notification.close(), 3000);
     }
+  }
+  
+  showCommandNotification(data) {
+    const prefs = this.preferenceManager;
+    
+    // Check if notifications are enabled
+    if (!prefs.get('notifications.enabled')) return;
+    
+    // Check if window is focused
+    if (document.hasFocus() && prefs.get('notifications.onlyWhenUnfocused')) return;
+    
+    // Determine notification type
+    let notificationType = 'NORMAL';
+    let sound = prefs.get('notifications.types.command.sound');
+    
+    if (data.isClaude) {
+      notificationType = 'CLAUDE';
+      sound = prefs.get('notifications.claudeCode.sound');
+    } else if (data.exitCode !== 0) {
+      notificationType = 'ERROR';
+      sound = prefs.get('notifications.types.error.sound');
+    } else if (this.detectBuildSuccess(data.command)) {
+      notificationType = 'BUILD_SUCCESS';
+      sound = prefs.get('notifications.types.buildSuccess.sound');
+    }
+    
+    const config = this.notificationTypes[notificationType];
+    
+    // Prepare notification
+    const title = config.title;
+    const body = `"${data.command}" が完了しました（${this.formatDuration(data.duration)}）`;
+    
+    // Show notification
+    try {
+      const notification = new Notification(title, {
+        body,
+        icon: '../../../assets/icon.png',
+        silent: !prefs.get('notifications.sounds.enabled') || sound === 'none',
+        // macOS specific sound
+        ...(process.platform === 'darwin' && sound && sound !== 'none' ? { sound } : {})
+      });
+      
+      // Click handler - focus window
+      notification.onclick = () => {
+        window.focus();
+        const session = this.terminals.get(this.activeTerminalId);
+        if (session && session.terminal) {
+          session.terminal.focus();
+        }
+      };
+      
+      // Auto close after 5 seconds
+      setTimeout(() => notification.close(), 5000);
+      
+    } catch (error) {
+      console.error('[ZeamiTermManager] Failed to show notification:', error);
+    }
+  }
+  
+  detectBuildSuccess(command) {
+    const buildPatterns = [
+      /build.*success/i,
+      /successfully built/i,
+      /compiled successfully/i,
+      /webpack.*compiled/i,
+      /✓.*build/i
+    ];
+    
+    return buildPatterns.some(pattern => pattern.test(command));
+  }
+  
+  formatDuration(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    
+    if (minutes > 0) {
+      return `${minutes}分${remainingSeconds}秒`;
+    }
+    return `${seconds}秒`;
   }
   
   switchToTerminal(id) {
