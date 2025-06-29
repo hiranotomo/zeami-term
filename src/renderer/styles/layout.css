@@ -221,6 +221,25 @@
   position: relative !important;
 }
 
+/* Overlay for inactive terminals */
+.terminal-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0);
+  pointer-events: none;
+  z-index: 100;
+  transition: background-color 0.2s ease;
+}
+
+.terminal-wrapper.inactive::before {
+  background: rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
 /* Override absolute positioning when in split mode */
 .layout-split-container .terminal-wrapper {
   position: relative !important;

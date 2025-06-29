@@ -27,6 +27,7 @@ export class ZeamiTermManager {
     this.preferenceManager = new PreferenceManager();
     this.preferenceWindow = new PreferenceWindow(this.preferenceManager);
     this.layoutManager = null; // Will be initialized after DOM is ready
+    this.fixedTerminals = true; // Always have exactly 2 terminals
     
     // Bind methods
     this.createTerminal = this.createTerminal.bind(this);
@@ -64,9 +65,9 @@ export class ZeamiTermManager {
     // Setup keyboard shortcuts
     this.setupKeyboardShortcuts();
     
-    // Create initial terminals (2 by default)
-    await this.createTerminal();
-    await this.createTerminal();
+    // Create exactly 2 fixed terminals
+    await this.createTerminal({ name: 'Terminal A', id: 'terminal-a' });
+    await this.createTerminal({ name: 'Terminal B', id: 'terminal-b' });
     
     // Initialize tabs UI
     this.updateTabsUI();
@@ -95,7 +96,7 @@ export class ZeamiTermManager {
   }
   
   async createTerminal(options = {}) {
-    const id = `terminal-${++this.terminalCounter}`;
+    const id = options.id || `terminal-${++this.terminalCounter}`;
     
     // Check if we should restore a session
     const shouldRestore = options.restoreSession !== false && this.terminals.size === 0;
@@ -297,10 +298,11 @@ export class ZeamiTermManager {
       webLinksAddon,
       rendererAddon,
       process: null,
-      title: `Terminal ${this.terminalCounter}`,
+      title: options.name || `Terminal ${this.terminalCounter}`,
       searchDecorations: [],
       wrapper,
-      cwd: options.cwd || null
+      cwd: options.cwd || null,
+      fixedId: options.id // Store fixed ID for Terminal A/B
     };
     
     this.terminals.set(id, session);
@@ -308,6 +310,9 @@ export class ZeamiTermManager {
     // Only set as active if it's the first terminal or explicitly requested
     if (!this.activeTerminalId || options.activate) {
       this.activeTerminalId = id;
+      wrapper.classList.add('active');
+    } else {
+      wrapper.classList.add('inactive');
     }
     
     
@@ -580,6 +585,12 @@ export class ZeamiTermManager {
     const session = this.terminals.get(id);
     if (!session) return;
     
+    // Don't close fixed terminals
+    if (this.fixedTerminals) {
+      console.log('[ZeamiTermManager] Cannot close fixed terminal:', id);
+      return;
+    }
+    
     // Kill PTY process
     if (session.process) {
       const api = window.electronAPI || window.zeamiAPI;
@@ -639,16 +650,18 @@ export class ZeamiTermManager {
       }
       
       // Legacy hardcoded shortcuts (will be removed later)
-      // Cmd/Ctrl + T: New terminal
+      // Cmd/Ctrl + T: New terminal (disabled for fixed terminals)
       if ((e.metaKey || e.ctrlKey) && e.key === 't') {
         e.preventDefault();
-        await this.createTerminal();
+        if (!this.fixedTerminals) {
+          await this.createTerminal();
+        }
       }
       
-      // Cmd/Ctrl + W: Close terminal
+      // Cmd/Ctrl + W: Close terminal (disabled for fixed terminals)
       if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
         e.preventDefault();
-        if (this.activeTerminalId) {
+        if (!this.fixedTerminals && this.activeTerminalId) {
           await this.closeTerminal(this.activeTerminalId);
         }
       }
@@ -689,7 +702,11 @@ export class ZeamiTermManager {
     
     // Button handlers
     document.getElementById('new-terminal-btn')?.addEventListener('click', 
-      () => this.createTerminal());
+      () => {
+        if (!this.fixedTerminals) {
+          this.createTerminal();
+        }
+      });
     
     document.getElementById('clear-terminal-btn')?.addEventListener('click', () => {
       const session = this.terminals.get(this.activeTerminalId);
@@ -1165,11 +1182,17 @@ export class ZeamiTermManager {
         tab.classList.add('active');
       }
       
-      // Tab content
-      tab.innerHTML = `
-        <span class="tab-title">${session.title || 'Terminal'}</span>
-        <span class="tab-close" data-terminal-id="${id}">×</span>
-      `;
+      // Tab content - no close button for fixed terminals
+      if (this.fixedTerminals) {
+        tab.innerHTML = `
+          <span class="tab-title">${session.title || 'Terminal'}</span>
+        `;
+      } else {
+        tab.innerHTML = `
+          <span class="tab-title">${session.title || 'Terminal'}</span>
+          <span class="tab-close" data-terminal-id="${id}">×</span>
+        `;
+      }
       
       // Click handler for tab
       tab.addEventListener('click', (e) => {
@@ -1179,19 +1202,93 @@ export class ZeamiTermManager {
         }
       });
       
-      // Click handler for close button
-      const closeBtn = tab.querySelector('.tab-close');
-      closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.closeTerminal(id);
-      });
+      // Click handler for close button (only if not fixed terminals)
+      if (!this.fixedTerminals) {
+        const closeBtn = tab.querySelector('.tab-close');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.closeTerminal(id);
+          });
+        }
+      }
       
       tabsContainer.appendChild(tab);
     });
   }
   
+  async saveCurrentTerminal() {
+    const session = this.terminals.get(this.activeTerminalId);
+    if (!session || !session.terminal) {
+      console.log('[ZeamiTermManager] No active terminal to save');
+      return;
+    }
+    
+    try {
+      // Get terminal buffer content using serialize addon
+      const serializeAddon = new (await import('@xterm/addon-serialize')).SerializeAddon();
+      session.terminal.loadAddon(serializeAddon);
+      
+      // Serialize the entire scrollback buffer and screen
+      const content = serializeAddon.serialize();
+      
+      // Create filename with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `terminal-${session.title.replace(' ', '-')}-${timestamp}.log`;
+      
+      // Convert ANSI escape codes to plain text
+      const plainText = content.replace(/\x1b\[[0-9;]*m/g, ''); // Remove color codes
+      
+      // Create a blob and download
+      const blob = new Blob([plainText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      URL.revokeObjectURL(url);
+      
+      console.log(`[ZeamiTermManager] Terminal saved to ${filename}`);
+      
+      // Show notification
+      const notification = new Notification('ターミナル保存完了', {
+        body: `${filename} として保存されました`,
+        icon: '../../../assets/icon.png'
+      });
+      
+      setTimeout(() => notification.close(), 3000);
+    } catch (error) {
+      console.error('[ZeamiTermManager] Failed to save terminal:', error);
+      
+      const notification = new Notification('保存エラー', {
+        body: 'ターミナルの保存に失敗しました',
+        icon: '../../../assets/icon.png'
+      });
+      
+      setTimeout(() => notification.close(), 3000);
+    }
+  }
+  
   switchToTerminal(id) {
     if (!this.terminals.has(id)) return;
+    
+    // Update inactive/active classes on all terminals
+    this.terminals.forEach((session, terminalId) => {
+      if (session.wrapper) {
+        if (terminalId === id) {
+          session.wrapper.classList.remove('inactive');
+          session.wrapper.classList.add('active');
+        } else {
+          session.wrapper.classList.remove('active');
+          session.wrapper.classList.add('inactive');
+        }
+      }
+    });
     
     this.activeTerminalId = id;
     

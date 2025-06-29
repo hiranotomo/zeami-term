@@ -44,6 +44,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           case 'find':
             manager.toggleSearch();
             break;
+          case 'save-terminal':
+            manager.saveCurrentTerminal();
+            break;
           default:
             console.log('[TerminalManager] Unknown menu action:', action);
         }

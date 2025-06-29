@@ -68,6 +68,24 @@ function createWindow(isMain = true) {
   window.loadFile(path.join(__dirname, '../renderer/index.html'));
 
   // Handle window closed
+  // Handle window close event
+  window.on('close', (e) => {
+    e.preventDefault();
+    
+    const choice = dialog.showMessageBoxSync(window, {
+      type: 'warning',
+      buttons: ['キャンセル', '閉じる'],
+      defaultId: 0,
+      cancelId: 0,
+      message: 'ウィンドウを閉じますか？',
+      detail: '実行中のターミナルセッションが終了します。'
+    });
+    
+    if (choice === 1) {
+      window.destroy();
+    }
+  });
+  
   window.on('closed', () => {
     if (isMain) {
       // Remove all event listeners from ptyService before nulling mainWindow
@@ -420,9 +438,36 @@ function createApplicationMenu() {
         },
         { type: 'separator' },
         { 
+          label: '現在のターミナルを保存', 
+          accelerator: isMac ? 'Cmd+S' : 'Ctrl+S',
+          click: () => {
+            const window = BrowserWindow.getFocusedWindow();
+            if (window && !window.isDestroyed()) {
+              window.webContents.send('menu-action', 'save-terminal');
+            }
+          }
+        },
+        { type: 'separator' },
+        { 
           label: 'ウィンドウを閉じる', 
           accelerator: isMac ? 'Cmd+W' : 'Ctrl+W', 
-          role: 'close'
+          click: async (menuItem, browserWindow) => {
+            const window = browserWindow || BrowserWindow.getFocusedWindow();
+            if (window) {
+              const choice = dialog.showMessageBoxSync(window, {
+                type: 'warning',
+                buttons: ['キャンセル', '閉じる'],
+                defaultId: 0,
+                cancelId: 0,
+                message: 'ウィンドウを閉じますか？',
+                detail: '実行中のターミナルセッションが終了します。'
+              });
+              
+              if (choice === 1) {
+                window.close();
+              }
+            }
+          }
         }
       ]
     },
@@ -485,7 +530,27 @@ function createApplicationMenu() {
       label: 'ウィンドウ',
       submenu: [
         { label: '最小化', accelerator: 'CmdOrCtrl+M', role: 'minimize' },
-        { label: '閉じる', accelerator: 'CmdOrCtrl+W', role: 'close' },
+        { 
+          label: '閉じる', 
+          accelerator: 'CmdOrCtrl+W', 
+          click: async (menuItem, browserWindow) => {
+            const window = browserWindow || BrowserWindow.getFocusedWindow();
+            if (window) {
+              const choice = dialog.showMessageBoxSync(window, {
+                type: 'warning',
+                buttons: ['キャンセル', '閉じる'],
+                defaultId: 0,
+                cancelId: 0,
+                message: 'ウィンドウを閉じますか？',
+                detail: '実行中のターミナルセッションが終了します。'
+              });
+              
+              if (choice === 1) {
+                window.close();
+              }
+            }
+          }
+        },
         ...(isMac ? [
           { type: 'separator' },
           { label: 'すべてを前面に', role: 'front' }
