@@ -444,13 +444,21 @@ export class LayoutManager {
         const wrapper = node.wrapper;
         if (wrapper && wrapper.offsetParent !== null) {
           // Terminal is visible
-          const terminal = this.terminalManager.terminals.get(terminalId);
-          if (terminal && terminal.fitAddon) {
-            terminal.fitAddon.fit();
+          const session = this.terminalManager.terminals.get(terminalId);
+          if (session && session.fitAddon) {
+            try {
+              session.fitAddon.fit();
+              // Force terminal refresh after fit
+              if (session.terminal) {
+                session.terminal.refresh(0, session.terminal.rows - 1);
+              }
+            } catch (error) {
+              console.warn('[LayoutManager] Failed to fit terminal:', error);
+            }
           }
         }
       });
-    }, 0);
+    }, 50); // Increased delay to ensure DOM is fully updated
   }
   
   /**

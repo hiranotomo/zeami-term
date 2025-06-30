@@ -101,7 +101,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Show notification with sound
-  showNotification: (options) => ipcRenderer.invoke('show-notification', options)
+  showNotification: (options) => ipcRenderer.invoke('show-notification', options),
+  
+  // Message Center API
+  sendToMessageCenter: (message) => ipcRenderer.invoke('sendToMessageCenter', message),
+  getWindowId: () => ipcRenderer.invoke('getWindowId'),
+  openMessageCenter: () => ipcRenderer.send('messageCenter:open'),
+  
+  // Terminal messaging
+  onTerminalMessage: (callback) => {
+    ipcRenderer.on('terminal:incomingMessage', (event, data) => callback(data));
+  },
+  onTerminalBroadcast: (callback) => {
+    ipcRenderer.on('terminal:broadcast', (event, message) => callback(message));
+  }
 });
 
 // Legacy API for backward compatibility with existing code

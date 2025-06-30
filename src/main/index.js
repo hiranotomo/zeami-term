@@ -5,6 +5,9 @@ const { SessionManager } = require('./sessionManager');
 const AutoUpdaterManager = require('./autoUpdater');
 const ZeamiErrorRecorder = require('./zeamiErrorRecorder');
 const { TerminalProcessManager } = require('./terminalProcessManager');
+const { MonitorWindow } = require('./monitorWindow');
+const { MessageCenterWindow } = require('./messageCenterWindow');
+const { MessageCenterService } = require('./services/MessageCenterService');
 // const { PreferenceManager } = require('../features/preferences/PreferenceManager');
 
 // Get version from package.json
@@ -18,6 +21,9 @@ let sessionManager;
 let autoUpdaterManager;
 let errorRecorder;
 let terminalProcessManager;
+let monitorWindow;
+let messageCenterWindow;
+let messageCenterService;
 // let preferenceManager;
 const windows = new Set();
 
@@ -279,6 +285,18 @@ function setupIpcHandlers() {
     }
   });
   
+  // Monitor window handlers
+  ipcMain.on('monitor:open', () => {
+    if (monitorWindow) {
+      monitorWindow.create();
+    }
+  });
+  
+  ipcMain.on('monitor:request-history', (event) => {
+    // History is automatically sent when window is created
+    // This is handled in MonitorWindow class
+  });
+  
   // Profile management handlers
   ipcMain.handle('profiles:get', async () => {
     try {
@@ -428,6 +446,104 @@ function setupIpcHandlers() {
       return 0;
     }
   });
+  
+  // Message Center handlers
+  ipcMain.handle('messageCenter:sendToTerminal', async (event, { targetWindowId, targetTerminalId, message }) => {
+    try {
+      return messageCenterService.sendToTerminal(targetWindowId, targetTerminalId, message);
+    } catch (error) {
+      console.error('[Main] Failed to send message to terminal:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('messageCenter:broadcast', async (event, message) => {
+    try {
+      return messageCenterService.broadcastMessage(message);
+    } catch (error) {
+      console.error('[Main] Failed to broadcast message:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('messageCenter:resendNotification', async (event, messageId) => {
+    try {
+      // Find the message in history
+      const messages = messageCenterWindow.messageHistory;
+      const message = messages.find(m => m.id === messageId);
+      
+      if (message && message.notification) {
+        await ipcMain.handle('show-notification', event, message.notification);
+        return { success: true };
+      }
+      
+      return { success: false, error: 'Message not found or has no notification data' };
+    } catch (error) {
+      console.error('[Main] Failed to resend notification:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('messageCenter:clearHistory', async () => {
+    try {
+      messageCenterService.clearHistory();
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to clear history:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('messageCenter:getFiltered', async (event, filter) => {
+    try {
+      const messages = messageCenterWindow.getFilteredMessages(filter);
+      return { success: true, messages };
+    } catch (error) {
+      console.error('[Main] Failed to get filtered messages:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Send message to Message Center
+  ipcMain.handle('sendToMessageCenter', async (event, message) => {
+    try {
+      return messageCenterService.forwardNotification(message);
+    } catch (error) {
+      console.error('[Main] Failed to send to Message Center:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Get window ID
+  ipcMain.handle('getWindowId', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return window ? window.id : null;
+  });
+  
+  // Message Center window handlers
+  ipcMain.on('messageCenter:open', () => {
+    if (messageCenterWindow) {
+      messageCenterWindow.create();
+    }
+  });
+  
+  ipcMain.on('messageCenter:requestData', (event) => {
+    if (messageCenterWindow) {
+      messageCenterWindow.sendHistory();
+    }
+  });
+  
+  // Handle terminal messages
+  ipcMain.on('terminal:message', (event, { targetId, message }) => {
+    // Forward to renderer
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+      window.webContents.send('terminal:incomingMessage', {
+        targetId,
+        message
+      });
+    }
+  });
 }
 
 // Create application menu
@@ -553,7 +669,26 @@ function createApplicationMenu() {
         { label: 'ズームイン', accelerator: 'CmdOrCtrl+=', role: 'zoomIn' },
         { label: 'ズームアウト', accelerator: 'CmdOrCtrl+-', role: 'zoomOut' },
         { type: 'separator' },
-        { label: 'フルスクリーン', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11', role: 'togglefullscreen' }
+        { label: 'フルスクリーン', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11', role: 'togglefullscreen' },
+        { type: 'separator' },
+        { 
+          label: 'データモニター', 
+          accelerator: isMac ? 'Cmd+Shift+M' : 'Ctrl+Shift+M',
+          click: () => {
+            if (monitorWindow) {
+              monitorWindow.create();
+            }
+          }
+        },
+        { 
+          label: 'Message Center', 
+          accelerator: isMac ? 'Cmd+Shift+C' : 'Ctrl+Shift+C',
+          click: () => {
+            if (messageCenterWindow) {
+              messageCenterWindow.create();
+            }
+          }
+        }
       ]
     },
     
@@ -655,6 +790,16 @@ app.whenReady().then(async () => {
   
   terminalProcessManager = new TerminalProcessManager();
   console.log('[Main] TerminalProcessManager initialized');
+  
+  monitorWindow = new MonitorWindow();
+  global.monitorWindow = monitorWindow; // Make it globally accessible
+  console.log('[Main] MonitorWindow initialized');
+  
+  // Initialize Message Center
+  messageCenterWindow = new MessageCenterWindow();
+  messageCenterService = new MessageCenterService();
+  messageCenterService.initialize(messageCenterWindow);
+  console.log('[Main] Message Center initialized');
   
   // Setup IPC handlers
   setupIpcHandlers();

@@ -45,6 +45,10 @@ class TerminalProcessManager extends EventEmitter {
     // Forward events
     instance.on('data', (data) => {
       this.emit('data', sessionId, data);
+      // Send to monitor window if available
+      if (global.monitorWindow) {
+        global.monitorWindow.sendData(sessionId, 'output', data);
+      }
     });
 
     instance.on('pattern-detected', (pattern) => {
@@ -69,6 +73,10 @@ class TerminalProcessManager extends EventEmitter {
       console.log('[MANAGER] Found instance, writing data');
       instance.write(data);
       console.log('[MANAGER] Data written to instance');
+      // Send to monitor window if available
+      if (global.monitorWindow) {
+        global.monitorWindow.sendData(sessionId, 'input', data);
+      }
     } else {
       console.log('[MANAGER] No instance found for session:', sessionId);
     }

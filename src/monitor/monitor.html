@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeamiTerm Data Monitor</title>
+    <link rel="stylesheet" href="monitor.css">
+</head>
+<body>
+    <div class="monitor-container">
+        <div class="monitor-header">
+            <h1>Terminal Data Monitor</h1>
+            <div class="controls">
+                <label>
+                    <input type="checkbox" id="autoScroll" checked>
+                    Auto Scroll
+                </label>
+                <label>
+                    <input type="checkbox" id="showTimestamps" checked>
+                    Timestamps
+                </label>
+                <label>
+                    <input type="checkbox" id="showInput" checked>
+                    Input
+                </label>
+                <label>
+                    <input type="checkbox" id="showOutput" checked>
+                    Output
+                </label>
+                <label>
+                    <input type="checkbox" id="groupCommands" checked>
+                    Group by Command
+                </label>
+                <label>
+                    <input type="checkbox" id="showSequences">
+                    Show Sequences
+                </label>
+                <button id="clearData">Clear</button>
+            </div>
+        </div>
+        
+        <div class="monitor-stats">
+            <span>Session: <span id="sessionId">-</span></span>
+            <span>Total Events: <span id="eventCount">0</span></span>
+            <span>Input: <span id="inputCount">0</span></span>
+            <span>Output: <span id="outputCount">0</span></span>
+        </div>
+        
+        <div class="monitor-content" id="dataDisplay">
+            <!-- Data will be displayed here -->
+        </div>
+        
+        <div class="monitor-footer">
+            <input type="text" id="searchBox" placeholder="Search...">
+            <button id="exportData">Export</button>
+        </div>
+    </div>
+    
+    <script src="ansiParser.js"></script>
+    <script src="commandGrouper.js"></script>
+    <script src="monitor.js"></script>
+</body>
+</html>

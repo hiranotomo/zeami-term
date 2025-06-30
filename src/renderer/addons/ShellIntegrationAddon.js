@@ -64,6 +64,37 @@ export class ShellIntegrationAddon {
     const duration = command.endTime - command.startTime;
     const commandText = command.command.toLowerCase();
     
+    // Check if it's Zeami CLI command
+    const isZeamiCLI = commandText.startsWith('zeami ') || 
+                       commandText.startsWith('./zeami ') || 
+                       commandText.startsWith('../../bin/zeami ') ||
+                       commandText.startsWith('./bin/zeami ');
+    
+    if (isZeamiCLI) {
+      console.log('[ShellIntegrationAddon] Zeami CLI command detected, always sending to Message Center');
+      // Always send Zeami CLI commands to Message Center
+      this._emitEvent('zeamiCLICompleted', {
+        command: command.command || command.commandLine || 'Unknown command',
+        duration,
+        exitCode: command.exitCode,
+        output: command.output || [],
+        cwd: command.cwd || '',
+        isClaude: this._isFromClaude(commandText)
+      });
+      
+      // Also check for regular notification if long-running
+      if (duration >= 2000) { // 2 seconds for Zeami CLI
+        this._emitEvent('longCommandCompleted', {
+          command: command.command || command.commandLine || 'Unknown command',
+          duration,
+          exitCode: command.exitCode,
+          isClaude: false,
+          isZeamiCLI: true
+        });
+      }
+      return;
+    }
+    
     // Check if it's Claude Code
     const claudePatterns = prefs.get('notifications.claudeCode.detectPattern') || [];
     const isClaude = claudePatterns.some(pattern => 
@@ -91,6 +122,23 @@ export class ShellIntegrationAddon {
     } else {
       console.log('[ShellIntegrationAddon] Duration below threshold, no notification');
     }
+  }
+  
+  /**
+   * Check if Zeami CLI was called from Claude Code
+   */
+  _isFromClaude(commandText) {
+    // Check for common Claude Code indicators in the command or context
+    const claudeIndicators = [
+      'claude',
+      '--dangerously-skip-permissions',
+      'CLAUDE_',
+      'claude-code'
+    ];
+    
+    return claudeIndicators.some(indicator => 
+      commandText.toLowerCase().includes(indicator)
+    );
   }
   
   dispose() {
