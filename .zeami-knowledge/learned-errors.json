@@ -1,0 +1,25 @@
+{
+  "errors": [
+    {
+      "id": "notarization-auth-error-001",
+      "error": "Error: HTTP status code: 401. Invalid credentials. Username or password is incorrect.",
+      "solution": "正しいApple IDとApp-specific passwordを使用する。Apple ID: tomo@teleport.jp（ceo@teleport.co.jpは使わない）",
+      "context": "Apple公証時の認証エラー",
+      "date": "2025-06-29"
+    },
+    {
+      "id": "notarization-invalid-001",
+      "error": "The binary is not signed with a valid Developer ID certificate",
+      "solution": "electron-builder.ymlでidentity設定を確認。Ad-hoc署名ではなくDeveloper ID証明書を使用",
+      "context": "公証失敗",
+      "date": "2025-06-29"
+    },
+    {
+      "id": "notarization-stuck-001",
+      "error": "Status: In Progress (5時間以上)",
+      "solution": "Appleサーバー側の問題。通常は5-30分で完了。xcrun notarytool historyで状態確認",
+      "context": "公証プロセスの異常な遅延",
+      "date": "2025-06-29"
+    }
+  ]
+}

@@ -147,6 +147,22 @@ export class SimpleLayoutManager {
       }
       this.createSplitLayout();
     }
+    
+    // Force resize and refresh all terminals after layout change
+    setTimeout(() => {
+      this.resizeTerminals();
+      
+      // Additional refresh for all terminals to fix any display issues
+      this.terminalManager.terminals.forEach((session) => {
+        if (session.terminal) {
+          try {
+            session.terminal.refresh(0, session.terminal.rows - 1);
+          } catch (error) {
+            console.warn('[SimpleLayoutManager] Failed to refresh terminal after mode change:', error);
+          }
+        }
+      });
+    }, 200); // Give layout time to settle
   }
   
   switchToTabMode() {
@@ -347,13 +363,21 @@ export class SimpleLayoutManager {
     setTimeout(() => {
       this.terminals.forEach((wrapper, id) => {
         if (wrapper.offsetParent !== null) { // Terminal is visible
-          const terminal = this.terminalManager.terminals.get(id);
-          if (terminal && terminal.fitAddon) {
-            terminal.fitAddon.fit();
+          const session = this.terminalManager.terminals.get(id);
+          if (session && session.fitAddon) {
+            try {
+              session.fitAddon.fit();
+              // Force terminal refresh to fix display issues
+              if (session.terminal) {
+                session.terminal.refresh(0, session.terminal.rows - 1);
+              }
+            } catch (error) {
+              console.warn('[SimpleLayoutManager] Failed to fit terminal:', error);
+            }
           }
         }
       });
-    }, 50);
+    }, 100); // Increased delay for better stability
   }
   
   focusTerminal(id) {

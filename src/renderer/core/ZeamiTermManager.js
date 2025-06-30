@@ -100,9 +100,34 @@ export class ZeamiTermManager {
     // Setup menu action handler
     this.setupMenuActionHandler();
     
+    // Setup window resize handler with debounce
+    this.setupResizeHandler();
+    
+    // Setup message handlers
+    this.setupMessageHandlers();
+    
+    // Get window ID for terminal registration
+    const windowId = await this.getWindowId();
+    
     // Create exactly 2 fixed terminals
-    await this.createTerminal({ name: 'Terminal A', id: 'terminal-a' });
-    await this.createTerminal({ name: 'Terminal B', id: 'terminal-b' });
+    await this.createTerminal({ 
+      name: 'Terminal A', 
+      id: 'terminal-a',
+      env: { 
+        ZEAMI_TERMINAL_ID: 'A', 
+        ZEAMI_TERMINAL_NAME: 'Terminal A',
+        ZEAMI_WINDOW_ID: windowId.toString()
+      }
+    });
+    await this.createTerminal({ 
+      name: 'Terminal B', 
+      id: 'terminal-b',
+      env: { 
+        ZEAMI_TERMINAL_ID: 'B', 
+        ZEAMI_TERMINAL_NAME: 'Terminal B',
+        ZEAMI_WINDOW_ID: windowId.toString()
+      }
+    });
     
     // Initialize tabs UI
     this.updateTabsUI();
@@ -259,6 +284,11 @@ export class ZeamiTermManager {
       if (eventName === 'longCommandCompleted') {
         console.log('[ZeamiTermManager] Long command completed, showing notification:', data);
         this.showCommandNotification(data);
+      } 
+      // Handle Zeami CLI completion
+      else if (eventName === 'zeamiCLICompleted') {
+        console.log('[ZeamiTermManager] Zeami CLI command completed:', data);
+        this.handleZeamiCLICompletion(data);
       } else {
         console.log('[ZeamiTermManager] Received shell integration event:', eventName, data);
       }
@@ -380,7 +410,7 @@ export class ZeamiTermManager {
     this.updateTabsUI();
     
     // Connect to PTY
-    await this.connectTerminal(session, shouldRestore);
+    await this.connectTerminal(session, shouldRestore, options);
     
     // Focus terminal only if it's the active one
     if (id === this.activeTerminalId) {
@@ -461,7 +491,7 @@ export class ZeamiTermManager {
     });
   }
   
-  async connectTerminal(session, shouldRestore = false) {
+  async connectTerminal(session, shouldRestore = false, options = {}) {
     const api = window.electronAPI || window.zeamiAPI;
     if (!api) {
       session.terminal.writeln('ZeamiTerm - Terminal API not available');
@@ -479,13 +509,15 @@ export class ZeamiTermManager {
         result = await window.electronAPI.createTerminal({
           cols: session.terminal.cols,
           rows: session.terminal.rows,
-          profileId: this.selectedProfileId
+          profileId: this.selectedProfileId,
+          env: options.env || {}
         });
       } else {
         result = await window.zeamiAPI.startSession({
           cols: session.terminal.cols,
           rows: session.terminal.rows,
-          profileId: this.selectedProfileId
+          profileId: this.selectedProfileId,
+          env: options.env || {}
         });
       }
       
@@ -849,6 +881,61 @@ export class ZeamiTermManager {
         }
       });
     }
+  }
+  
+  setupResizeHandler() {
+    let resizeTimer = null;
+    let resizeInProgress = false;
+    
+    window.addEventListener('resize', () => {
+      // Clear any existing timer
+      if (resizeTimer) {
+        clearTimeout(resizeTimer);
+      }
+      
+      // Mark resize as in progress
+      resizeInProgress = true;
+      
+      // Debounce the resize event
+      resizeTimer = setTimeout(() => {
+        resizeInProgress = false;
+        console.log('[ZeamiTermManager] Window resized, refitting all terminals');
+        
+        // First, let the layout manager update
+        if (this.layoutManager) {
+          this.layoutManager.resizeVisibleTerminals();
+        }
+        
+        // Then refit terminals with proper synchronization
+        setTimeout(() => {
+          this.terminals.forEach((session, id) => {
+            if (session.wrapper && session.wrapper.offsetParent !== null) {
+              // Terminal is visible
+              if (session.fitAddon && session.terminal) {
+                try {
+                  // Get current dimensions
+                  const dimensions = session.fitAddon.proposeDimensions();
+                  if (dimensions && dimensions.cols && dimensions.rows) {
+                    // Only resize if dimensions actually changed
+                    if (dimensions.cols !== session.terminal.cols || dimensions.rows !== session.terminal.rows) {
+                      session.terminal.resize(dimensions.cols, dimensions.rows);
+                    }
+                  }
+                  
+                  // Fit addon will handle the actual fitting
+                  session.fitAddon.fit();
+                  
+                  // Minimal refresh to update display
+                  session.terminal.refresh(0, session.terminal.rows - 1);
+                } catch (error) {
+                  console.warn('[ZeamiTermManager] Failed to fit terminal on resize:', error);
+                }
+              }
+            }
+          });
+        }, 50); // Small delay to ensure DOM is ready
+      }, 150); // Debounce for 150ms
+    });
   }
   
   async saveTerminalHistory() {
@@ -1417,7 +1504,7 @@ export class ZeamiTermManager {
     }
   }
   
-  showCommandNotification(data) {
+  async showCommandNotification(data) {
     console.log('[ZeamiTermManager] showCommandNotification called with:', data);
     
     const prefs = this.preferenceManager;
@@ -1466,6 +1553,37 @@ export class ZeamiTermManager {
     // Prepare notification
     const title = config.title;
     const body = `"${data.command || 'コマンド'}" が完了しました（${this.formatDuration(data.duration)}）`;
+    
+    // Forward to Message Center first
+    if (window.electronAPI && window.electronAPI.sendToMessageCenter) {
+      const messageData = {
+        type: 'command-notification',
+        source: {
+          windowId: await this.getWindowId(),
+          terminalId: this.activeTerminalId,
+          terminalName: this.getTerminalName(this.activeTerminalId)
+        },
+        timestamp: Date.now(),
+        data: {
+          command: data.command,
+          duration: data.duration,
+          exitCode: data.exitCode,
+          isClaude: data.isClaude,
+          notificationType
+        },
+        notification: {
+          title,
+          body,
+          sound: sound && sound !== 'none' ? sound : null,
+          silent: !prefs.get('notifications.sounds.enabled') || sound === 'none'
+        }
+      };
+      
+      // Send to Message Center
+      window.electronAPI.sendToMessageCenter(messageData).catch(err => {
+        console.warn('[ZeamiTermManager] Failed to send to Message Center:', err);
+      });
+    }
     
     // Show notification using Electron API for proper sound support
     try {
@@ -1524,6 +1642,155 @@ export class ZeamiTermManager {
       return `${minutes}分${remainingSeconds}秒`;
     }
     return `${seconds}秒`;
+  }
+  
+  async getWindowId() {
+    if (window.electronAPI && window.electronAPI.getWindowId) {
+      return await window.electronAPI.getWindowId();
+    }
+    return 'unknown';
+  }
+  
+  getTerminalName(terminalId) {
+    const session = this.terminals.get(terminalId);
+    if (session && session.name) {
+      return session.name;
+    }
+    // Extract terminal letter from ID (e.g., "terminal-a" -> "A")
+    const match = terminalId.match(/terminal-(\w)/);
+    if (match) {
+      return `Terminal ${match[1].toUpperCase()}`;
+    }
+    return terminalId;
+  }
+  
+  setupMessageHandlers() {
+    // Handle incoming messages from other terminals
+    if (window.electronAPI && window.electronAPI.onTerminalMessage) {
+      window.electronAPI.onTerminalMessage(({ targetId, message }) => {
+        console.log('[ZeamiTermManager] Received terminal message:', { targetId, message });
+        
+        // Find the target terminal
+        const session = this.terminals.get(targetId);
+        if (session && session.terminal) {
+          // Display message in terminal
+          const formattedMessage = `\r\n\x1b[36m[Message from ${message.source.windowId === 'message-center' ? 'Message Center' : message.source.terminalId || 'Unknown'}]\x1b[0m\r\n${message.content}\r\n`;
+          session.terminal.write(formattedMessage);
+          
+          // Show notification if enabled
+          if (this.preferenceManager.get('notifications.enabled')) {
+            window.electronAPI.showNotification({
+              title: '💬 新しいメッセージ',
+              body: message.content,
+              sound: 'Glass'
+            });
+          }
+        }
+      });
+    }
+    
+    // Handle broadcast messages
+    if (window.electronAPI && window.electronAPI.onTerminalBroadcast) {
+      window.electronAPI.onTerminalBroadcast((message) => {
+        console.log('[ZeamiTermManager] Received broadcast message:', message);
+        
+        // Display in all terminals
+        this.terminals.forEach((session, id) => {
+          if (session.terminal) {
+            const formattedMessage = `\r\n\x1b[33m[Broadcast from ${message.source.windowId === 'message-center' ? 'Message Center' : message.source.terminalId || 'Unknown'}]\x1b[0m\r\n${message.content}\r\n`;
+            session.terminal.write(formattedMessage);
+          }
+        });
+        
+        // Show notification
+        if (this.preferenceManager.get('notifications.enabled')) {
+          window.electronAPI.showNotification({
+            title: '📢 ブロードキャストメッセージ',
+            body: message.content,
+            sound: 'Ping'
+          });
+        }
+      });
+    }
+  }
+  
+  async handleZeamiCLICompletion(data) {
+    console.log('[ZeamiTermManager] Processing Zeami CLI completion:', data);
+    
+    // Extract command info
+    const commandParts = data.command.split(' ');
+    const zeamiCommand = commandParts.slice(1).join(' '); // Remove 'zeami' part
+    
+    // Determine notification type based on exit code and command
+    let notificationType = 'ZEAMI_CLI';
+    let icon = '⚡';
+    let title = 'Zeami CLI 完了';
+    
+    if (data.exitCode !== 0) {
+      notificationType = 'ZEAMI_CLI_ERROR';
+      icon = '❌';
+      title = 'Zeami CLI エラー';
+    } else if (zeamiCommand.includes('type')) {
+      icon = '🔍';
+      title = 'Zeami Type Check 完了';
+    } else if (zeamiCommand.includes('learn')) {
+      icon = '🧠';
+      title = 'Zeami Learn 完了';
+    } else if (zeamiCommand.includes('batch')) {
+      icon = '📦';
+      title = 'Zeami Batch 完了';
+    } else if (zeamiCommand.includes('doc')) {
+      icon = '📝';
+      title = 'Zeami Doc 完了';
+    }
+    
+    // Format the message
+    const formattedCommand = data.isClaude ? 
+      `[Claude Code] ${data.command}` : 
+      data.command;
+    
+    // Send to Message Center
+    if (window.electronAPI && window.electronAPI.sendToMessageCenter) {
+      const messageData = {
+        type: 'zeami-cli-notification',
+        source: {
+          windowId: await this.getWindowId(),
+          terminalId: this.activeTerminalId,
+          terminalName: this.getTerminalName(this.activeTerminalId)
+        },
+        timestamp: Date.now(),
+        data: {
+          command: data.command,
+          zeamiCommand: zeamiCommand,
+          duration: data.duration,
+          exitCode: data.exitCode,
+          cwd: data.cwd,
+          isClaude: data.isClaude,
+          notificationType
+        },
+        notification: {
+          title: `${icon} ${title}`,
+          body: `${formattedCommand}\n実行時間: ${this.formatDuration(data.duration)}`,
+          sound: data.exitCode === 0 ? 'Glass' : 'Basso'
+        }
+      };
+      
+      try {
+        await window.electronAPI.sendToMessageCenter(messageData);
+        console.log('[ZeamiTermManager] Zeami CLI completion sent to Message Center');
+      } catch (err) {
+        console.warn('[ZeamiTermManager] Failed to send Zeami CLI completion to Message Center:', err);
+      }
+    }
+    
+    // Also show local notification if enabled
+    if (this.preferenceManager.get('notifications.enabled')) {
+      window.electronAPI.showNotification({
+        title: `${icon} ${title}`,
+        body: `${formattedCommand}\n実行時間: ${this.formatDuration(data.duration)}`,
+        sound: data.exitCode === 0 ? 'Glass' : 'Basso'
+      });
+    }
   }
   
   testNotification(type) {

@@ -135,6 +135,10 @@ class PtyService extends EventEmitter {
     const bufferer = new DataBufferer(id, (data) => {
       console.log(`[PtyService] DataBufferer callback: id=${id}, data length=${data.length}`);
       this.emit('data', { id, data });
+      // Send to monitor window if available
+      if (global.monitorWindow) {
+        global.monitorWindow.sendData(id, 'output', data);
+      }
     }, this.patternDetector, commandFormatter);
     this.dataBufferers.set(id, bufferer);
     
@@ -378,6 +382,11 @@ process.on('SIGWINCH', () => {
     if (!processInfo || !processInfo.isRunning) {
       console.warn(`[PtyService] Cannot write to process ${id} - not running`);
       return;
+    }
+    
+    // Send input to monitor window if available
+    if (global.monitorWindow) {
+      global.monitorWindow.sendData(id, 'input', data);
     }
     
     // Detect command for formatting (when Enter is pressed)
