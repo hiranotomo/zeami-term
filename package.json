@@ -25,6 +25,8 @@
     "release:major": "./scripts/quick-release.sh major",
     "release:prepare": "./scripts/prepare-release.sh",
     "release": "./scripts/automated-release.sh",
+    "release:validate": "node scripts/validate-release-files.js",
+    "release:safe": "npm run build && npm run release:validate && npm run publish:mac",
     "test": "jest",
     "test:smoke": "electron test/smoke-test.js",
     "test:integration": "node test/integration-test.js",
