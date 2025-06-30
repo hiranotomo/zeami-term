@@ -447,6 +447,37 @@ function setupIpcHandlers() {
     }
   });
   
+  // Shell integration handlers
+  ipcMain.handle('shellIntegration:check', async (event, shellPath) => {
+    try {
+      const isInstalled = await terminalProcessManager.isShellIntegrationInstalled(shellPath);
+      return { success: true, installed: isInstalled };
+    } catch (error) {
+      console.error('[Main] Failed to check shell integration:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('shellIntegration:install', async (event, shellPath) => {
+    try {
+      const result = await terminalProcessManager.installShellIntegration(shellPath);
+      return { success: true, ...result };
+    } catch (error) {
+      console.error('[Main] Failed to install shell integration:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('shellIntegration:getCommand', async (event, shellPath) => {
+    try {
+      const command = terminalProcessManager.getShellIntegrationCommand(shellPath);
+      return { success: true, command };
+    } catch (error) {
+      console.error('[Main] Failed to get shell integration command:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
   // Message Center handlers
   ipcMain.handle('messageCenter:sendToTerminal', async (event, { targetWindowId, targetTerminalId, message }) => {
     try {

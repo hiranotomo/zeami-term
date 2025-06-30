@@ -16,6 +16,7 @@ import { SessionPersistence } from '../../features/session/SessionPersistence.js
 import { PreferenceManager } from '../../features/preferences/PreferenceManager.js';
 import { PreferenceWindow } from '../components/PreferenceWindow.js';
 import { SimpleLayoutManager } from './SimpleLayoutManager.js';
+import { ShellIntegrationSetup } from '../components/ShellIntegrationSetup.js';
 
 export class ZeamiTermManager {
   constructor() {
@@ -29,6 +30,8 @@ export class ZeamiTermManager {
     this.layoutManager = null; // Will be initialized after DOM is ready
     this.fixedTerminals = true; // Always have exactly 2 terminals
     this.updateNotifier = null; // Will be initialized in init()
+    this.shellIntegrationSetup = new ShellIntegrationSetup();
+    this.shellIntegrationChecked = new Set(); // Track which shells we've already checked
     
     // Bind methods
     this.createTerminal = this.createTerminal.bind(this);
@@ -532,6 +535,47 @@ export class ZeamiTermManager {
         
         // Update session's cwd
         session.cwd = result.cwd;
+        
+        // Check and prompt for shell integration
+        if (result.shell) {
+          // Check if shell integration is enabled in preferences
+          const shellIntegrationEnabled = this.preferenceManager.get('terminal.shellIntegration.enabled');
+          
+          if (shellIntegrationEnabled !== false) {
+            // Check if already installed for this shell
+            const installedShells = this.preferenceManager.get('terminal.shellIntegration.installedShells') || {};
+            
+            if (!installedShells[result.shell]) {
+              // Show setup dialog after a short delay
+              setTimeout(async () => {
+                const setupResult = await this.shellIntegrationSetup.show(result.shell);
+                console.log('[ZeamiTermManager] Shell integration setup result:', setupResult);
+                
+                if (setupResult.action === 'installed') {
+                  // Mark as installed
+                  installedShells[result.shell] = true;
+                  this.preferenceManager.set('terminal.shellIntegration.installedShells', installedShells);
+                  await this.preferenceManager.save();
+                  
+                  // Source the RC file in current session
+                  setTimeout(() => {
+                    const sourceCmd = `source ${setupResult.rcFile || '~/.bashrc'}`;
+                    window.electronAPI.sendInput(session.process.id, sourceCmd + '\n');
+                    this.showNotification('Shell integration enabled and activated!', 'info');
+                  }, 500);
+                } else if (setupResult.action === 'session_only') {
+                  // Session only - already activated by ZeamiInstance
+                  this.showNotification('Shell integration enabled for this session', 'info');
+                } else if (setupResult.action === 'never') {
+                  // User chose never - mark it so we don't ask again
+                  installedShells[result.shell] = 'never';
+                  this.preferenceManager.set('terminal.shellIntegration.installedShells', installedShells);
+                  await this.preferenceManager.save();
+                }
+              }, 1000);
+            }
+          }
+        }
         
         // Set PTY handler for user input
         session.terminal.setPtyHandler((data) => {

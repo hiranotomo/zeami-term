@@ -17,6 +17,7 @@ class ZeamiInstance extends EventEmitter {
     this.messageRouter = new MessageRouter();
     this.patternDetector = new PatternDetector();
     this.enableShellIntegration = options.enableShellIntegration !== false; // default true
+    this.shellIntegrationCmd = options.shellIntegrationCmd; // Command to run for shell integration
     this.shellIntegrationInjected = false;
     this.context = {
       currentDirectory: this.cwd,
@@ -131,31 +132,53 @@ class ZeamiInstance extends EventEmitter {
     
     console.log('[ZeamiInstance] Injecting shell integration...');
     
-    const shellName = path.basename(this.shell || process.env.SHELL || '/bin/bash');
-    const integration = this.getShellIntegrationCode(shellName);
-    
-    if (integration) {
+    // Use the provided shell integration command if available
+    if (this.shellIntegrationCmd) {
+      console.log('[ZeamiInstance] Using provided shell integration command:', this.shellIntegrationCmd);
+      
       // Clear any partial input first
       this.ptyProcess.write('\x03'); // Ctrl+C
       
-      // Write integration code
       setTimeout(() => {
-        // Send each line separately to avoid issues with long commands
-        const lines = integration.split('\n').filter(line => line.trim());
-        lines.forEach((line, index) => {
-          setTimeout(() => {
-            this.ptyProcess.write(line + '\n');
-          }, index * 10); // Small delay between lines
-        });
+        // Execute the shell integration command
+        this.ptyProcess.write(this.shellIntegrationCmd + '\n');
         
         this.shellIntegrationInjected = true;
-        console.log('[ZeamiInstance] Shell integration injected for', shellName);
+        console.log('[ZeamiInstance] Shell integration command executed');
         
         // Clear the screen after injection
         setTimeout(() => {
           this.ptyProcess.write('clear\n');
-        }, lines.length * 10 + 100);
+        }, 200);
       }, 100);
+    } else {
+      // Fallback to inline integration (for backward compatibility)
+      const shellName = path.basename(this.shell || process.env.SHELL || '/bin/bash');
+      const integration = this.getShellIntegrationCode(shellName);
+      
+      if (integration) {
+        // Clear any partial input first
+        this.ptyProcess.write('\x03'); // Ctrl+C
+        
+        // Write integration code
+        setTimeout(() => {
+          // Send each line separately to avoid issues with long commands
+          const lines = integration.split('\n').filter(line => line.trim());
+          lines.forEach((line, index) => {
+            setTimeout(() => {
+              this.ptyProcess.write(line + '\n');
+            }, index * 10); // Small delay between lines
+          });
+          
+          this.shellIntegrationInjected = true;
+          console.log('[ZeamiInstance] Shell integration injected for', shellName);
+          
+          // Clear the screen after injection
+          setTimeout(() => {
+            this.ptyProcess.write('clear\n');
+          }, lines.length * 10 + 100);
+        }, 100);
+      }
     }
   }
   

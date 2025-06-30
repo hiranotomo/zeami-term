@@ -40,7 +40,12 @@ export class PreferenceManager {
         tabStopWidth: 8,
         bellStyle: 'sound', // none, sound, visual, both
         bellSound: true,
-        visualBell: false
+        visualBell: false,
+        shellIntegration: {
+          enabled: true,
+          autoPrompt: true, // Auto-prompt for shell integration on first launch
+          installedShells: {} // Track which shells have integration installed
+        }
       },
       
       // Theme Settings

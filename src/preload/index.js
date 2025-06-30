@@ -114,6 +114,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onTerminalBroadcast: (callback) => {
     ipcRenderer.on('terminal:broadcast', (event, message) => callback(message));
+  },
+  
+  // Shell integration
+  shellIntegration: {
+    check: (shellPath) => ipcRenderer.invoke('shellIntegration:check', shellPath),
+    install: (shellPath) => ipcRenderer.invoke('shellIntegration:install', shellPath),
+    getCommand: (shellPath) => ipcRenderer.invoke('shellIntegration:getCommand', shellPath)
+  }
+});
+
+// Expose api object for new components
+contextBridge.exposeInMainWorld('api', {
+  shellIntegration: {
+    check: (shellPath) => ipcRenderer.invoke('shellIntegration:check', shellPath),
+    install: (shellPath) => ipcRenderer.invoke('shellIntegration:install', shellPath),
+    getCommand: (shellPath) => ipcRenderer.invoke('shellIntegration:getCommand', shellPath)
   }
 });
 

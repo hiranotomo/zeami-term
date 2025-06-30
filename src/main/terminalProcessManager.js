@@ -1,6 +1,8 @@
 const { EventEmitter } = require('events');
 const { ZeamiInstance } = require('./zeamiInstance');
 const { TerminalProfileManager } = require('./profiles/TerminalProfileManager');
+const { ShellScriptGenerator } = require('./shellIntegration/ShellScriptGenerator');
+const { app } = require('electron');
 
 class TerminalProcessManager extends EventEmitter {
   constructor() {
@@ -8,9 +10,23 @@ class TerminalProcessManager extends EventEmitter {
     this.sessions = new Map();
     this.nextSessionId = 1;
     this.profileManager = new TerminalProfileManager();
+    this.shellScriptGenerator = new ShellScriptGenerator();
+    
+    // Initialize shell script generator
+    this._initializeShellIntegration();
     
     // Load saved profiles
     this.profileManager.loadProfiles().catch(console.error);
+  }
+
+  async _initializeShellIntegration() {
+    try {
+      const appDataPath = app.getPath('userData');
+      await this.shellScriptGenerator.initialize(appDataPath);
+      console.log('[TerminalProcessManager] Shell integration scripts initialized');
+    } catch (error) {
+      console.error('[TerminalProcessManager] Failed to initialize shell integration:', error);
+    }
   }
 
   async createSession(options = {}) {
@@ -32,6 +48,12 @@ class TerminalProcessManager extends EventEmitter {
       }
     );
     
+    // Get shell integration command if enabled
+    let shellIntegrationCmd = null;
+    if (options.enableShellIntegration !== false) {
+      shellIntegrationCmd = this.shellScriptGenerator.getInitCommand(terminalOptions.shell);
+    }
+    
     const instance = new ZeamiInstance({
       sessionId,
       shell: terminalOptions.shell,
@@ -39,7 +61,8 @@ class TerminalProcessManager extends EventEmitter {
       cwd: terminalOptions.cwd,
       env: terminalOptions.env,
       profile: terminalOptions.profile,
-      enableShellIntegration: true  // デフォルトで有効
+      enableShellIntegration: true,  // デフォルトで有効
+      shellIntegrationCmd
     });
 
     // Forward events
@@ -142,6 +165,20 @@ class TerminalProcessManager extends EventEmitter {
   async setDefaultProfile(id) {
     this.profileManager.setDefaultProfile(id);
     await this.profileManager.saveProfiles();
+  }
+  
+  // Shell integration methods
+  
+  async isShellIntegrationInstalled(shellPath) {
+    return await this.shellScriptGenerator.isIntegrationInstalled(shellPath);
+  }
+  
+  async installShellIntegration(shellPath) {
+    return await this.shellScriptGenerator.installForShell(shellPath);
+  }
+  
+  getShellIntegrationCommand(shellPath) {
+    return this.shellScriptGenerator.getIntCommand(shellPath);
   }
 }
 
