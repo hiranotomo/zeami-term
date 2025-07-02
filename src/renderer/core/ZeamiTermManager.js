@@ -291,11 +291,15 @@ export class ZeamiTermManager {
           enhancedLinkProvider._cwd = data;
         }
         
-        // Update file explorer if this is the active terminal
-        if (this.fileExplorer && this.fileExplorer.isVisible && 
-            session.id === this.activeTerminalId) {
-          session.cwd = data; // Update session's cwd
-          this.fileExplorer.updatePath(data);
+        // Always update session's cwd
+        session.cwd = data;
+        
+        // Update file explorer immediately if this is the active terminal and explorer is visible
+        if (this.fileExplorer && session.id === this.activeTerminalId) {
+          console.log('[ZeamiTermManager] CWD changed for active terminal:', data);
+          if (this.fileExplorer.isVisible) {
+            this.fileExplorer.updatePath(data);
+          }
         }
       }
       
