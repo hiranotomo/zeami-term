@@ -529,7 +529,8 @@ export class ZeamiTermManager {
           cols: session.terminal.cols,
           rows: session.terminal.rows,
           profileId: this.selectedProfileId,
-          env: options.env || {}
+          env: options.env || {},
+          cwd: options.cwd || '/Users/hirano/develop/Zeami-1/projects/zeami-term' // Use provided cwd or project directory
         });
       } else {
         result = await window.zeamiAPI.startSession({
@@ -790,8 +791,17 @@ export class ZeamiTermManager {
     this.updateTabsUI();
     
     // Update file explorer if visible
-    if (this.fileExplorer && this.fileExplorer.isVisible && session.cwd) {
-      this.fileExplorer.updatePath(session.cwd);
+    if (this.fileExplorer && this.fileExplorer.isVisible) {
+      // Try to get cwd from session or process
+      let currentPath = session.cwd || session.process?.cwd;
+      
+      if (!currentPath) {
+        // Fallback to home directory
+        currentPath = process.env.HOME || '/Users/' + process.env.USER;
+      }
+      
+      console.log('[ZeamiTermManager] switchToTerminal - Updating file explorer path:', currentPath);
+      this.fileExplorer.updatePath(currentPath);
     }
   }
   
@@ -1501,8 +1511,17 @@ export class ZeamiTermManager {
     const tabsContainer = document.getElementById('tabs-container');
     if (!tabsContainer) return;
     
-    // Clear existing tabs
-    tabsContainer.innerHTML = '';
+    // Save the file explorer toggle button before clearing
+    const fileExplorerToggle = document.getElementById('file-explorer-toggle');
+    
+    // Clear existing tabs but keep file explorer toggle
+    const existingTabs = tabsContainer.querySelectorAll('.tab');
+    existingTabs.forEach(tab => tab.remove());
+    
+    // Re-add file explorer toggle if it was removed
+    if (fileExplorerToggle && !tabsContainer.contains(fileExplorerToggle)) {
+      tabsContainer.insertBefore(fileExplorerToggle, tabsContainer.firstChild);
+    }
     
     // Create tabs for each terminal
     this.terminals.forEach((session, id) => {
@@ -2016,9 +2035,28 @@ export class ZeamiTermManager {
       // Update file explorer with current terminal's directory
       if (isVisible) {
         const activeSession = this.terminals.get(this.activeTerminalId);
-        if (activeSession && activeSession.cwd) {
-          this.fileExplorer.updatePath(activeSession.cwd);
+        console.log('[ZeamiTermManager] toggleFileExplorer - Active session:', {
+          id: this.activeTerminalId,
+          session: activeSession,
+          cwd: activeSession?.cwd,
+          process: activeSession?.process
+        });
+        
+        // Try to get cwd from session or process
+        let currentPath = activeSession?.cwd || activeSession?.process?.cwd;
+        
+        if (!currentPath && activeSession?.process) {
+          // If no cwd, use the process's initial cwd
+          currentPath = activeSession.process.cwd;
         }
+        
+        if (!currentPath) {
+          // Fallback to home directory
+          currentPath = process.env.HOME || '/Users/' + process.env.USER;
+        }
+        
+        console.log('[ZeamiTermManager] Using path for file explorer:', currentPath);
+        this.fileExplorer.updatePath(currentPath);
       }
     }
   }
