@@ -17,6 +17,7 @@ import { PreferenceManager } from '../../features/preferences/PreferenceManager.
 import { PreferenceWindow } from '../components/PreferenceWindow.js';
 import { SimpleLayoutManager } from './SimpleLayoutManager.js';
 import { ShellIntegrationSetup } from '../components/ShellIntegrationSetup.js';
+import { FileExplorer } from '../components/FileExplorer.js';
 
 export class ZeamiTermManager {
   constructor() {
@@ -32,6 +33,7 @@ export class ZeamiTermManager {
     this.updateNotifier = null; // Will be initialized in init()
     this.shellIntegrationSetup = new ShellIntegrationSetup();
     this.shellIntegrationChecked = new Set(); // Track which shells we've already checked
+    this.fileExplorer = null; // Will be initialized after DOM is ready
     
     // Bind methods
     this.createTerminal = this.createTerminal.bind(this);
@@ -39,6 +41,7 @@ export class ZeamiTermManager {
     this.toggleSearch = this.toggleSearch.bind(this);
     this.setupSearch = this.setupSearch.bind(this);
     this.applyPreferences = this.applyPreferences.bind(this);
+    this.sendToActiveTerminal = this.sendToActiveTerminal.bind(this);
     
     // Listen for preference changes
     this.preferenceManager.on('*', (value, oldValue, path) => {
@@ -87,6 +90,10 @@ export class ZeamiTermManager {
     const container = document.getElementById('terminal-container');
     this.layoutManager = new SimpleLayoutManager(container, this);
     this.layoutManager.init();
+    
+    // Initialize file explorer
+    this.fileExplorer = new FileExplorer(this);
+    this.fileExplorer.init();
     
     // Load saved sessions
     this.sessionPersistence.loadFromStorage();
@@ -278,9 +285,18 @@ export class ZeamiTermManager {
         this.showNotification(msg, 'error');
       }
       
-      // Forward CWD changes to link provider
-      if (eventName === 'cwdChange' && enhancedLinkProvider) {
-        enhancedLinkProvider._cwd = data;
+      // Forward CWD changes to link provider and file explorer
+      if (eventName === 'cwdChange') {
+        if (enhancedLinkProvider) {
+          enhancedLinkProvider._cwd = data;
+        }
+        
+        // Update file explorer if this is the active terminal
+        if (this.fileExplorer && this.fileExplorer.isVisible && 
+            session.id === this.activeTerminalId) {
+          session.cwd = data; // Update session's cwd
+          this.fileExplorer.updatePath(data);
+        }
       }
       
       // Handle long command completion
@@ -1964,5 +1980,23 @@ export class ZeamiTermManager {
     
     // Update tabs UI
     this.updateTabsUI();
+    
+    // Update file explorer if visible
+    if (this.fileExplorer && this.fileExplorer.isVisible && session.cwd) {
+      this.fileExplorer.updatePath(session.cwd);
+    }
+  }
+  
+  sendToActiveTerminal(command) {
+    const activeSession = this.terminals.get(this.activeTerminalId);
+    if (activeSession && activeSession.terminal) {
+      activeSession.terminal.paste(command);
+    }
+  }
+  
+  toggleFileExplorer() {
+    if (this.fileExplorer) {
+      this.fileExplorer.toggle();
+    }
   }
 }

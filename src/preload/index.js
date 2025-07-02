@@ -121,7 +121,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     check: (shellPath) => ipcRenderer.invoke('shellIntegration:check', shellPath),
     install: (shellPath) => ipcRenderer.invoke('shellIntegration:install', shellPath),
     getCommand: (shellPath) => ipcRenderer.invoke('shellIntegration:getCommand', shellPath)
-  }
+  },
+  
+  // File system operations
+  listDirectory: (path) => ipcRenderer.invoke('fs:listDirectory', path)
 });
 
 // Expose api object for new components

@@ -47,6 +47,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           case 'save-terminal':
             manager.saveCurrentTerminal();
             break;
+          case 'toggle-file-explorer':
+            manager.toggleFileExplorer();
+            break;
           default:
             console.log('[TerminalManager] Unknown menu action:', action);
         }

@@ -447,6 +447,46 @@ function setupIpcHandlers() {
     }
   });
   
+  // File system handlers
+  ipcMain.handle('fs:listDirectory', async (event, dirPath) => {
+    try {
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      const files = await fs.readdir(dirPath, { withFileTypes: true });
+      const fileList = await Promise.all(files.map(async (dirent) => {
+        const filePath = path.join(dirPath, dirent.name);
+        try {
+          const stats = await fs.stat(filePath);
+          return {
+            name: dirent.name,
+            path: filePath,
+            isDirectory: dirent.isDirectory(),
+            size: stats.size,
+            modified: stats.mtime,
+            hidden: dirent.name.startsWith('.')
+          };
+        } catch (error) {
+          // Handle permission errors
+          return {
+            name: dirent.name,
+            path: filePath,
+            isDirectory: dirent.isDirectory(),
+            size: 0,
+            modified: null,
+            hidden: dirent.name.startsWith('.'),
+            error: error.message
+          };
+        }
+      }));
+      
+      return { success: true, files: fileList };
+    } catch (error) {
+      console.error('[Main] Failed to list directory:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
   // Shell integration handlers
   ipcMain.handle('shellIntegration:check', async (event, shellPath) => {
     try {
