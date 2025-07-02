@@ -39,23 +39,6 @@ export class FileExplorer {
     header.className = 'file-explorer-header';
     header.innerHTML = `
       <div class="file-explorer-title">Files</div>
-      <div class="file-explorer-actions">
-        <button class="file-explorer-action" title="New File" data-action="new-file">
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <path fill="currentColor" d="M9 7h6v2H9v6H7V9H1V7h6V1h2v6z"/>
-          </svg>
-        </button>
-        <button class="file-explorer-action" title="New Folder" data-action="new-folder">
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <path fill="currentColor" d="M14 4H7.5l-1-1H2c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1h12c.55 0 1-.45 1-1V5c0-.55-.45-1-1-1zM8 11H6v-1h2V8h1v2h2v1H9v2H8v-2z"/>
-          </svg>
-        </button>
-        <button class="file-explorer-action" title="Refresh" data-action="refresh">
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <path fill="currentColor" d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165.033.163c.071.363.133.664.187.904.096.434.16.605.153.594-.005-.008-.073-.121-.189-.353a8.5 8.5 0 0 0-.107-.222c-.172-.353-.279-.573-.392-.72-.245-.316-.47-.556-.645-.726-.116-.113-.196-.174-.211-.183a.654.654 0 0 0-.056-.015c-.118-.024-.303.004-.692.196-.463.228-1.092.644-1.845 1.283-1.02.866-2.297 2.146-3.476 3.754l-.192.262c-.497.676-.907 1.236-1.232 1.666-.491.65-.84 1.088-1.02 1.359l-.088.132.565.579 1.086-.821.047-.059c.179-.226.513-.695.961-1.296.322-.433.724-.958 1.204-1.579l.195-.253c1.139-1.468 2.326-2.715 3.257-3.506.693-.589 1.223-.94 1.515-1.084.13-.064.172-.065.178-.064.003 0 .026.004.068.031.02.014.08.062.174.147.144.133.337.34.546.611.085.11.176.244.326.546.038.077.079.16.122.25.129.265.25.532.347.734.124.253.209.439.255.547l.001.002c.132.295.164.332.205.332.03 0 .066-.016.129-.114.038-.058.095-.162.19-.384.052-.125.115-.285.197-.526.081-.241.176-.537.255-.896l.011-.049c.13-2.018.637-3.34 1.097-4.009l.045-.067.138-.103z"/>
-          </svg>
-        </button>
-      </div>
     `;
     
     // Search bar
@@ -331,6 +314,7 @@ export class FileExplorer {
     } else {
       this.show();
     }
+    return this.isVisible;
   }
 
   show() {

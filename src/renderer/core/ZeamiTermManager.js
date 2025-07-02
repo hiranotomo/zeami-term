@@ -956,6 +956,11 @@ export class ZeamiTermManager {
     document.getElementById('preferences-btn')?.addEventListener('click', () => {
       this.preferenceWindow.open();
     });
+    
+    // File explorer toggle button
+    document.getElementById('file-explorer-toggle')?.addEventListener('click', () => {
+      this.toggleFileExplorer();
+    });
   }
   
   setupMenuActionHandler() {
@@ -1996,7 +2001,25 @@ export class ZeamiTermManager {
   
   toggleFileExplorer() {
     if (this.fileExplorer) {
-      this.fileExplorer.toggle();
+      const isVisible = this.fileExplorer.toggle();
+      
+      // Update button state
+      const toggleButton = document.getElementById('file-explorer-toggle');
+      if (toggleButton) {
+        if (isVisible) {
+          toggleButton.classList.add('active');
+        } else {
+          toggleButton.classList.remove('active');
+        }
+      }
+      
+      // Update file explorer with current terminal's directory
+      if (isVisible) {
+        const activeSession = this.terminals.get(this.activeTerminalId);
+        if (activeSession && activeSession.cwd) {
+          this.fileExplorer.updatePath(activeSession.cwd);
+        }
+      }
     }
   }
 }

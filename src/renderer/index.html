@@ -69,6 +69,32 @@
       z-index: 60;
     }
     
+    .file-explorer-toggle {
+      background: none;
+      border: 1px solid transparent;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      margin-right: 8px;
+    }
+    
+    .file-explorer-toggle:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .file-explorer-toggle.active {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: #007acc;
+    }
+    
+    .file-explorer-toggle svg {
+      width: 20px;
+      height: 20px;
+    }
+    
     .tab {
       padding: 4px 12px;
       background: transparent;
@@ -449,6 +475,11 @@
     </div>
     <div class="header">
       <div class="tabs-container" id="tabs-container">
+        <button class="action-button file-explorer-toggle" id="file-explorer-toggle" title="ファイルエクスプローラー">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill="currentColor" d="M2.5 2h4l1.5 1.5H13c.827 0 1.5.673 1.5 1.5v7.5c0 .827-.673 1.5-1.5 1.5H2.5c-.827 0-1.5-.673-1.5-1.5v-9c0-.827.673-1.5 1.5-1.5z"/>
+          </svg>
+        </button>
         <!-- Tabs will be dynamically added here -->
       </div>
       <div class="actions">
