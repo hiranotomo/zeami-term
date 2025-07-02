@@ -758,9 +758,41 @@ export class ZeamiTermManager {
   }
   
   switchToTerminal(id) {
-    // Deprecated - handled by LayoutManager
-    console.warn('[ZeamiTermManager] switchToTerminal is deprecated, use LayoutManager');
-    this.focusTerminal(id);
+    if (!this.terminals.has(id)) return;
+    
+    // Update inactive/active classes on all terminals
+    this.terminals.forEach((session, terminalId) => {
+      if (session.wrapper) {
+        if (terminalId === id) {
+          session.wrapper.classList.remove('inactive');
+          session.wrapper.classList.add('active');
+        } else {
+          session.wrapper.classList.remove('active');
+          session.wrapper.classList.add('inactive');
+        }
+      }
+    });
+    
+    this.activeTerminalId = id;
+    
+    // Update layout manager
+    if (this.layoutManager && this.layoutManager.mode === 'tab') {
+      this.layoutManager.updateLayout();
+    }
+    
+    // Focus the terminal
+    const session = this.terminals.get(id);
+    if (session && session.terminal) {
+      session.terminal.focus();
+    }
+    
+    // Update tabs UI
+    this.updateTabsUI();
+    
+    // Update file explorer if visible
+    if (this.fileExplorer && this.fileExplorer.isVisible && session.cwd) {
+      this.fileExplorer.updatePath(session.cwd);
+    }
   }
   
   focusTerminal(id) {
@@ -879,6 +911,12 @@ export class ZeamiTermManager {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
         this.toggleSearch();
+      }
+      
+      // Cmd/Ctrl + Shift + E: Toggle File Explorer
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'E') {
+        e.preventDefault();
+        this.toggleFileExplorer();
       }
       
       // Cmd/Ctrl + Up: Previous command
@@ -1946,44 +1984,6 @@ export class ZeamiTermManager {
     } catch (error) {
       console.error('[ZeamiTermManager] Failed to show test notification:', error);
       alert('通知の表示に失敗しました。システム設定で通知が許可されているか確認してください。');
-    }
-  }
-  
-  switchToTerminal(id) {
-    if (!this.terminals.has(id)) return;
-    
-    // Update inactive/active classes on all terminals
-    this.terminals.forEach((session, terminalId) => {
-      if (session.wrapper) {
-        if (terminalId === id) {
-          session.wrapper.classList.remove('inactive');
-          session.wrapper.classList.add('active');
-        } else {
-          session.wrapper.classList.remove('active');
-          session.wrapper.classList.add('inactive');
-        }
-      }
-    });
-    
-    this.activeTerminalId = id;
-    
-    // Update layout manager
-    if (this.layoutManager && this.layoutManager.mode === 'tab') {
-      this.layoutManager.updateLayout();
-    }
-    
-    // Focus the terminal
-    const session = this.terminals.get(id);
-    if (session && session.terminal) {
-      session.terminal.focus();
-    }
-    
-    // Update tabs UI
-    this.updateTabsUI();
-    
-    // Update file explorer if visible
-    if (this.fileExplorer && this.fileExplorer.isVisible && session.cwd) {
-      this.fileExplorer.updatePath(session.cwd);
     }
   }
   

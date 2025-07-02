@@ -87,18 +87,18 @@ export class FileExplorer {
     this.container.appendChild(resizeHandle);
     
     // Insert into DOM (hidden by default)
-    const terminalContainer = document.getElementById('terminal-container');
-    terminalContainer.parentNode.insertBefore(this.container, terminalContainer);
+    // Add to body to avoid interfering with the main app layout
+    document.body.appendChild(this.container);
   }
 
   applyStyles() {
     const style = document.createElement('style');
     style.textContent = `
       .file-explorer {
-        position: absolute;
+        position: fixed;
         left: 0;
-        top: 0;
-        bottom: 0;
+        top: 97px; /* Below titlebar (32px) + header (65px) */
+        bottom: 24px; /* Above status bar */
         width: 250px;
         background-color: var(--vscode-sideBar-background);
         border-right: 1px solid var(--vscode-panel-border);
@@ -106,11 +106,13 @@ export class FileExplorer {
         flex-direction: column;
         transform: translateX(-100%);
         transition: transform 0.2s ease-out;
-        z-index: 100;
+        z-index: 10;
+        pointer-events: none;
       }
       
       .file-explorer.visible {
         transform: translateX(0);
+        pointer-events: auto;
       }
       
       .file-explorer-header {

@@ -742,6 +742,16 @@ function createApplicationMenu() {
         { type: 'separator' },
         { label: 'フルスクリーン', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11', role: 'togglefullscreen' },
         { type: 'separator' },
+        {
+          label: 'ファイルエクスプローラー',
+          accelerator: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
+          click: () => {
+            const window = BrowserWindow.getFocusedWindow();
+            if (window && !window.isDestroyed()) {
+              window.webContents.send('menu-action', 'toggle-file-explorer');
+            }
+          }
+        },
         { 
           label: 'データモニター', 
           accelerator: isMac ? 'Cmd+Shift+M' : 'Ctrl+Shift+M',
