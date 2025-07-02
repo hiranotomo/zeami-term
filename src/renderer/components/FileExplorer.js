@@ -39,6 +39,7 @@ export class FileExplorer {
     header.className = 'file-explorer-header';
     header.innerHTML = `
       <div class="file-explorer-title">Files</div>
+      <div class="file-explorer-path" id="file-explorer-path" title="">~/</div>
     `;
     
     // Search bar
@@ -100,8 +101,8 @@ export class FileExplorer {
       
       .file-explorer-header {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
+        flex-direction: column;
+        gap: 8px;
         padding: 8px 12px;
         border-bottom: 1px solid var(--vscode-panel-border);
         user-select: none;
@@ -112,6 +113,25 @@ export class FileExplorer {
         font-weight: 600;
         text-transform: uppercase;
         opacity: 0.8;
+      }
+      
+      .file-explorer-path {
+        font-size: 12px;
+        color: var(--vscode-foreground);
+        opacity: 0.7;
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 4px 8px;
+        background-color: var(--vscode-input-background);
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 4px;
+        cursor: default;
+      }
+      
+      .file-explorer-path:hover {
+        opacity: 1;
       }
       
       .file-explorer-actions {
@@ -340,6 +360,15 @@ export class FileExplorer {
     
     this.currentPath = path;
     this.showLoading(true);
+    
+    // Update path display
+    const pathElement = document.getElementById('file-explorer-path');
+    if (pathElement) {
+      // Convert home directory to ~
+      const displayPath = path.replace(process.env.HOME || '/Users/' + process.env.USER, '~');
+      pathElement.textContent = displayPath;
+      pathElement.title = path; // Show full path on hover
+    }
     
     try {
       const files = await this.loadDirectory(path);
