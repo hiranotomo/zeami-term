@@ -8,6 +8,7 @@ const { TerminalProcessManager } = require('./terminalProcessManager');
 const { MonitorWindow } = require('./monitorWindow');
 const { MessageCenterWindow } = require('./messageCenterWindow');
 const { MessageCenterService } = require('./services/MessageCenterService');
+const { ShellIntegrationCleaner } = require('./shellIntegrationCleaner');
 // const { PreferenceManager } = require('../features/preferences/PreferenceManager');
 
 // Get version from package.json
@@ -166,6 +167,7 @@ function setupIpcHandlers() {
   // Send input to terminal
   ipcMain.handle('terminal:input', async (event, { id, data }) => {
     try {
+      // Don't filter bracketed paste markers - let them through
       ptyService.writeToProcess(id, data);
       return { success: true };
     } catch (error) {
@@ -896,6 +898,15 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.warn('Failed to initialize error recorder:', err);
     // Continue without error recording if initialization fails
+  }
+  
+  // Clean shell integration if needed (runs only once)
+  try {
+    const shellCleaner = new ShellIntegrationCleaner();
+    await shellCleaner.clean();
+  } catch (err) {
+    console.warn('Failed to clean shell integration:', err);
+    // Continue even if cleanup fails
   }
   
   // Initialize auto updater

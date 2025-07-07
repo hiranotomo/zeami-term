@@ -9,6 +9,11 @@ export class ShellIntegrationSetup {
   }
 
   async show(shellPath) {
+    // DISABLED: Shell integration is no longer supported
+    console.log('[ShellIntegrationSetup] Shell integration is disabled');
+    return { action: 'skip' };
+    
+    /* Original code disabled
     // Check if integration is already installed
     const checkResult = await window.api.shellIntegration.check(shellPath);
     
@@ -19,6 +24,7 @@ export class ShellIntegrationSetup {
     return new Promise((resolve) => {
       this.createDialog(shellPath, resolve);
     });
+    */
   }
 
   createDialog(shellPath, resolve) {
@@ -132,7 +138,8 @@ export class ShellIntegrationSetup {
     });
 
     installBtn.addEventListener('click', async () => {
-      const method = dialog.querySelector('input[name="integration-method"]:checked').value;
+      const checkedInput = dialog.querySelector('input[name="integration-method"]:checked');
+      const method = checkedInput ? checkedInput.value : 'session';
       
       if (method === 'permanent') {
         // Install permanently

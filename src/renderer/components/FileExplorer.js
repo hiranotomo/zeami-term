@@ -338,14 +338,26 @@ export class FileExplorer {
   }
 
   show() {
+    console.log('[FileExplorer] Show called');
     this.isVisible = true;
     this.container.classList.add('visible');
     document.getElementById('terminal-container').classList.add('file-explorer-visible');
     
     // Update file tree for current terminal
-    const activeTerminal = this.terminalManager.terminals.get(this.terminalManager.activeTerminalId);
+    const activeTerminalId = this.terminalManager.activeTerminalId;
+    console.log('[FileExplorer] Active terminal ID:', activeTerminalId);
+    
+    const activeTerminal = this.terminalManager.terminals.get(activeTerminalId);
+    console.log('[FileExplorer] Active terminal:', activeTerminal);
+    
     if (activeTerminal && activeTerminal.cwd) {
+      console.log('[FileExplorer] Terminal CWD:', activeTerminal.cwd);
       this.updatePath(activeTerminal.cwd);
+    } else {
+      // Fallback to default path if no cwd
+      const defaultPath = process.env.HOME || '/Users/' + process.env.USER || '/Users/hirano';
+      console.log('[FileExplorer] No terminal CWD, using default path:', defaultPath);
+      this.updatePath(defaultPath);
     }
   }
 
@@ -356,7 +368,20 @@ export class FileExplorer {
   }
 
   async updatePath(path) {
-    if (this.currentPath === path) return;
+    console.log('[FileExplorer] updatePath called with:', path);
+    
+    if (!path) {
+      console.warn('[FileExplorer] updatePath called with empty path');
+      // Use default path as fallback
+      const defaultPath = process.env.HOME || '/Users/' + process.env.USER || '/Users/hirano';
+      console.log('[FileExplorer] Using default path:', defaultPath);
+      path = defaultPath;
+    }
+    
+    if (this.currentPath === path) {
+      console.log('[FileExplorer] Path unchanged, skipping update');
+      return;
+    }
     
     this.currentPath = path;
     this.showLoading(true);
@@ -365,29 +390,47 @@ export class FileExplorer {
     const pathElement = document.getElementById('file-explorer-path');
     if (pathElement) {
       // Convert home directory to ~
-      const displayPath = path.replace(process.env.HOME || '/Users/' + process.env.USER, '~');
+      const homePath = process.env.HOME || '/Users/' + process.env.USER || '/Users/hirano';
+      const displayPath = path.replace(homePath, '~');
       pathElement.textContent = displayPath;
       pathElement.title = path; // Show full path on hover
+      console.log('[FileExplorer] Updated path display to:', displayPath);
     }
     
     try {
       const files = await this.loadDirectory(path);
+      console.log('[FileExplorer] Loaded', files.length, 'files');
       this.renderTree(files, path);
     } catch (error) {
       console.error('[FileExplorer] Failed to load directory:', error);
-      this.showError('Failed to load directory');
+      this.showError('Failed to load directory: ' + error.message);
     } finally {
       this.showLoading(false);
     }
   }
 
   async loadDirectory(path) {
-    // Request directory listing from main process
-    const result = await window.electronAPI.listDirectory(path);
-    if (result.success) {
-      return result.files;
-    } else {
-      throw new Error(result.error);
+    console.log('[FileExplorer] Loading directory:', path);
+    
+    // Check if electronAPI is available
+    if (!window.electronAPI || !window.electronAPI.listDirectory) {
+      console.error('[FileExplorer] electronAPI.listDirectory is not available');
+      throw new Error('electronAPI.listDirectory is not available');
+    }
+    
+    try {
+      // Request directory listing from main process
+      const result = await window.electronAPI.listDirectory(path);
+      console.log('[FileExplorer] Directory listing result:', result);
+      
+      if (result.success) {
+        return result.files;
+      } else {
+        throw new Error(result.error || 'Failed to list directory');
+      }
+    } catch (error) {
+      console.error('[FileExplorer] Error in loadDirectory:', error);
+      throw error;
     }
   }
 
@@ -559,7 +602,7 @@ export class FileExplorer {
   }
 
   showError(message) {
-    this.treeContainer.innerHTML = `<div style="padding: 20px; text-align: center; opacity: 0.6;">${message}</div>`;
+    this.treeContainer.innerHTML = `<div style="padding: 20px; text-align: center; opacity: 0.6; color: var(--vscode-errorForeground, #f48771);">${message}</div>`;
   }
 
   getFolderIcon() {

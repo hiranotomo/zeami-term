@@ -19,7 +19,12 @@ const getPtyConfig = () => {
       LC_ALL: process.env.LC_ALL || 'en_US.UTF-8',
       // Disable bracketed paste mode initially
       TERM_PROGRAM: 'ZeamiTerm',
-      TERM_PROGRAM_VERSION: '0.1.0'
+      TERM_PROGRAM_VERSION: '0.1.0',
+      // Tell Claude Code to handle its own paste processing
+      ZEAMI_DISABLE_PASTE_INTERCEPT: '1',
+      // Disable Claude Code's paste mode display
+      CLAUDE_DISABLE_PASTE_INDICATOR: '1',
+      NO_COLOR: '0' // Keep colors but disable paste indicator
     }
   };
 
@@ -31,7 +36,7 @@ const getPtyConfig = () => {
     // Terminal input modes (stty settings equivalent)
     baseConfig.modes = {
       // Input modes
-      echo: true,       // Enable echo (PTY will handle it properly)
+      echo: false,      // Disable echo to prevent double input (xterm.js handles local echo)
       icanon: true,     // Enable canonical mode for proper line editing
       isig: true,       // Enable signals (Ctrl+C, etc.)
       iexten: true,     // Enable extended input processing
@@ -70,10 +75,17 @@ const applyTerminalModes = (pty) => {
     // Send as a single command to minimize shell prompt re-displays
     pty.write(sttyCommand + '\r');
     
-    // Setup claude alias for the session
+    // Configure shell after initialization
     setTimeout(() => {
+      // Enable bracketed paste mode for the shell
+      pty.write('printf "\\e[?2004h"\r');
+      
+      // Setup claude alias for the session
       const claudeAlias = "alias claude='node --no-warnings --enable-source-maps $HOME/.npm-global/bin/claude'";
       pty.write(claudeAlias + '\r');
+      
+      // Clear the screen to start fresh
+      pty.write('clear\r');
     }, 300);
     
     // Don't clear screen here - let terminalManager handle it

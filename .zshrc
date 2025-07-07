@@ -14,3 +14,10 @@ source "$ZEAMI_TERM_PATH/scripts/setup-zeami-commands.zsh" 2>/dev/null
 
 # Custom prompt
 PROMPT='%F{green}zeami%f:%F{cyan}%~%f %# '
+
+# Enable bracketed paste mode
+# This allows proper handling of multi-line pastes
+if [[ $TERM == 'xterm'* ]] || [[ $TERM == 'screen'* ]]; then
+    # Enable bracketed paste mode at startup
+    printf '\e[?2004h'
+fi

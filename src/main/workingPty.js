@@ -109,6 +109,8 @@ def main():
             # Set ZDOTDIR to load our custom config for zsh
             if 'zsh' in shell:
                 os.environ['ZDOTDIR'] = os.environ.get('HOME', '') + '/develop/Zeami-1/projects/zeami-term'
+            # Add explicit bracketed paste mode support
+            os.environ['BRACKETED_PASTE_MODE'] = '1'
             os.execvp(shell, [shell, '-l', '-i'])
         else:
             os.execvp(shell, [shell, '-i'])
@@ -151,8 +153,8 @@ def main():
                     # Read from stdin and write to PTY
                     if sys.stdin in rfds:
                         try:
-                            # Read available data (up to 1024 bytes)
-                            data = os.read(sys.stdin.fileno(), 1024)
+                            # Read available data (up to 65536 bytes for large pastes)
+                            data = os.read(sys.stdin.fileno(), 65536)
                             if data:
                                 # Write immediately to PTY
                                 os.write(master_fd, data)
@@ -163,10 +165,11 @@ def main():
                     # Read from PTY and write to stdout
                     if master_fd in rfds:
                         try:
-                            data = os.read(master_fd, 10240)
+                            data = os.read(master_fd, 65536)
                             if data:
+                                # Pass through all data including escape sequences
                                 sys.stdout.buffer.write(data)
-                                sys.stdout.flush()
+                                sys.stdout.buffer.flush()
                         except OSError as e:
                             if e.errno != 11:  # Ignore EAGAIN
                                 break

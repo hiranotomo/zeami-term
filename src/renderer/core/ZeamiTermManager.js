@@ -18,6 +18,7 @@ import { PreferenceWindow } from '../components/PreferenceWindow.js';
 import { SimpleLayoutManager } from './SimpleLayoutManager.js';
 import { ShellIntegrationSetup } from '../components/ShellIntegrationSetup.js';
 import { FileExplorer } from '../components/FileExplorer.js';
+import { pasteDebugger } from '../utils/PasteDebugger.js';
 
 export class ZeamiTermManager {
   constructor() {
@@ -34,6 +35,10 @@ export class ZeamiTermManager {
     this.shellIntegrationSetup = new ShellIntegrationSetup();
     this.shellIntegrationChecked = new Set(); // Track which shells we've already checked
     this.fileExplorer = null; // Will be initialized after DOM is ready
+    
+    // Prevent infinite loops
+    this.isInitializing = false;
+    this.terminalsBeingCreated = new Set();
     
     // Bind methods
     this.createTerminal = this.createTerminal.bind(this);
@@ -59,6 +64,13 @@ export class ZeamiTermManager {
   
   async init() {
     console.log('[ZeamiTermManager] Initializing with clean architecture...');
+    
+    // Prevent duplicate initialization
+    if (this.isInitializing) {
+      console.warn('[ZeamiTermManager] Already initializing, skipping...');
+      return;
+    }
+    this.isInitializing = true;
     
     // Make manager accessible globally for testing and addons
     window.zeamiTermManager = this;
@@ -168,6 +180,15 @@ export class ZeamiTermManager {
   async createTerminal(options = {}) {
     const id = options.id || `terminal-${++this.terminalCounter}`;
     
+    // Prevent duplicate creation
+    if (this.terminalsBeingCreated.has(id)) {
+      console.warn(`[ZeamiTermManager] Terminal ${id} is already being created`);
+      return;
+    }
+    
+    this.terminalsBeingCreated.add(id);
+    
+    try {
     // Check if we should restore a session
     const shouldRestore = options.restoreSession !== false && this.terminals.size === 0;
     
@@ -221,14 +242,37 @@ export class ZeamiTermManager {
       macOptionIsMeta: true, // Mac Option key as Meta
       allowProposedApi: true, // Enable proposed APIs
       screenReaderMode: false, // Disable screen reader mode for better performance
+      // ENABLE bracketed paste mode for proper paste handling
+      bracketedPasteMode: true,
       ...options
     });
     
     // Open terminal in wrapper
     terminal.open(wrapper);
     
+    // Let ZeamiTerminal handle paste via _handleData
+    // This ensures all paste processing happens in one place
+    
+    // Enable bracketed paste mode to ensure Claude Code can detect paste events
+    // Send CSI ? 2004 h (set bracketed paste mode)
+    setTimeout(() => {
+      if (session.terminal._ptyHandler) {
+        console.log('[ZeamiTermManager] Sending control sequence to ENABLE bracketed paste mode');
+        // Send CSI ? 2004 h (set bracketed paste mode)
+        session.terminal._ptyHandler('\x1b[?2004h');
+        pasteDebugger.log('info', 'Sent control sequence to ENABLE bracketed paste mode');
+        
+        // Also send a newline to ensure the command is processed
+        setTimeout(() => {
+          session.terminal._ptyHandler('\r');
+          console.log('[ZeamiTermManager] Sent newline after bracketed paste mode enable');
+        }, 50);
+      }
+    }, 500); // Increased delay to ensure terminal is ready
+    
     // Register builtin commands
     this.registerBuiltinCommands(terminal);
+    
     
     // Handle selection for copy functionality
     terminal.onSelectionChange(() => {
@@ -271,9 +315,10 @@ export class ZeamiTermManager {
     const enhancedLinkProvider = new EnhancedLinkProvider();
     terminal.loadAddon(enhancedLinkProvider);
     
-    // Shell integration addon
-    const shellIntegrationAddon = new ShellIntegrationAddon();
-    terminal.loadAddon(shellIntegrationAddon);
+    // DISABLED: Shell integration addon - may interfere with paste
+    // const shellIntegrationAddon = new ShellIntegrationAddon();
+    // terminal.loadAddon(shellIntegrationAddon);
+    const shellIntegrationAddon = null;
     
     // Listen to shell integration events
     terminal.onShellIntegrationEvent = (eventName, data) => {
@@ -385,10 +430,17 @@ export class ZeamiTermManager {
     setTimeout(fitTerminal, 100);
     setTimeout(fitTerminal, 200);
     
-    // Refit on window resize
+    // Refit on window resize with debounce
+    let resizeInProgress = false;
     const resizeObserver = new ResizeObserver(() => {
+      if (resizeInProgress) return;
+      
+      resizeInProgress = true;
       clearTimeout(this._resizeTimeout);
-      this._resizeTimeout = setTimeout(fitTerminal, 50);
+      this._resizeTimeout = setTimeout(() => {
+        fitTerminal();
+        resizeInProgress = false;
+      }, 50);
     });
     resizeObserver.observe(wrapper);
     
@@ -435,6 +487,12 @@ export class ZeamiTermManager {
     // Connect to PTY
     await this.connectTerminal(session, shouldRestore, options);
     
+    // Update session cwd from process if available
+    if (session.process && session.process.cwd) {
+      session.cwd = session.process.cwd;
+      console.log('[ZeamiTermManager] Set initial CWD from process:', session.cwd);
+    }
+    
     // Focus terminal only if it's the active one
     if (id === this.activeTerminalId) {
       terminal.focus();
@@ -447,6 +505,10 @@ export class ZeamiTermManager {
     }
     
     return session;
+    } finally {
+      // Always remove from creating set
+      this.terminalsBeingCreated.delete(id);
+    }
   }
   
   registerBuiltinCommands(terminal) {
@@ -558,7 +620,7 @@ export class ZeamiTermManager {
         session.cwd = result.cwd;
         
         // Check and prompt for shell integration
-        if (result.shell) {
+        if (false && result.shell) {  // Temporarily disabled to fix infinite loop
           // Check if shell integration is enabled in preferences
           const shellIntegrationEnabled = this.preferenceManager.get('terminal.shellIntegration.enabled');
           
@@ -576,7 +638,7 @@ export class ZeamiTermManager {
                   // Mark as installed
                   installedShells[result.shell] = true;
                   this.preferenceManager.set('terminal.shellIntegration.installedShells', installedShells);
-                  await this.preferenceManager.save();
+                  this.preferenceManager.savePreferences();
                   
                   // Source the RC file in current session
                   setTimeout(() => {
@@ -591,7 +653,7 @@ export class ZeamiTermManager {
                   // User chose never - mark it so we don't ask again
                   installedShells[result.shell] = 'never';
                   this.preferenceManager.set('terminal.shellIntegration.installedShells', installedShells);
-                  await this.preferenceManager.save();
+                  this.preferenceManager.savePreferences();
                 }
               }, 1000);
             }
@@ -601,6 +663,34 @@ export class ZeamiTermManager {
         // Set PTY handler for user input
         session.terminal.setPtyHandler((data) => {
           console.log(`[Renderer] Sending user input to PTY: ${JSON.stringify(data)}`);
+          
+          // Enhanced logging for paste debugging
+          const hasStartMarker = data.includes('\x1b[200~');
+          const hasEndMarker = data.includes('\x1b[201~');
+          
+          if (hasStartMarker || hasEndMarker) {
+            console.log('[PASTE DEBUG] Data from setPtyHandler contains markers - this is expected with bracketedPasteMode enabled');
+            pasteDebugger.log('info', 'setPtyHandler received data with markers', { 
+              time: new Date().toISOString(),
+              hasStartMarker,
+              hasEndMarker,
+              length: data.length,
+              preview: data.substring(0, 50).replace(/\x1b/g, 'ESC')
+            });
+          }
+          
+          // Log large data transfers
+          if (data.length > 100) {
+            console.log(`[PASTE DEBUG] Large data from setPtyHandler: ${data.length} bytes`);
+            pasteDebugger.log('info', `setPtyHandler large data: ${data.length} bytes`, {
+              lines: data.split('\n').length,
+              hasMarkers: hasStartMarker || hasEndMarker,
+              preview: data.substring(0, 50).replace(/\x1b/g, 'ESC') + '...'
+            });
+          }
+          
+          // Send data to PTY - markers should already be stripped by onPaste handler
+          
           if (window.electronAPI) {
             window.electronAPI.sendInput(session.process.id, data);
           } else {
@@ -1020,7 +1110,7 @@ export class ZeamiTermManager {
         
         // First, let the layout manager update
         if (this.layoutManager) {
-          this.layoutManager.resizeVisibleTerminals();
+          this.layoutManager.resizeTerminals();
         }
         
         // Then refit terminals with proper synchronization
@@ -1411,7 +1501,8 @@ export class ZeamiTermManager {
       // For font size changes, we need to ensure the renderer updates
       if (terminal._core && terminal._core._renderService) {
         terminal._core._renderService.clear();
-        terminal._core._renderService.onResize(terminal.cols, terminal.rows);
+        // Use public API instead of internal methods
+        terminal.resize(terminal.cols, terminal.rows);
       }
       
       // Refresh the entire terminal

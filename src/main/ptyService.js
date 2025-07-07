@@ -28,11 +28,11 @@ class PtyService extends EventEmitter {
       defaultShell: this.detectDefaultShell(),
       defaultCwd: os.homedir(),
       env: this.prepareEnvironment(),
-      // Flow control settings from VS Code
-      highWaterMark: 12000, // chars
-      lowWaterMark: 4000,   // chars
-      chunkSize: 50,        // chars per write
-      writeInterval: 5      // ms between chunks
+      // Flow control settings - DISABLE chunking for paste to work properly
+      highWaterMark: 1000000, // chars (1MB)
+      lowWaterMark: 500000,   // chars (500KB)
+      chunkSize: 65536,       // chars per write (64KB - much larger chunks)
+      writeInterval: 0        // ms between chunks (no delay)
     };
   }
   
@@ -142,12 +142,23 @@ class PtyService extends EventEmitter {
     }, this.patternDetector, commandFormatter);
     this.dataBufferers.set(id, bufferer);
     
+    // DISABLED: Claude paste detection - let Claude Code handle its own paste mode
+    // This was causing issues with paste markers being sent at wrong times
+    /*
+    bufferer.onClaudePasteDetected = () => {
+      console.log(`[PtyService] Claude paste detected - NOT sending any markers`);
+    };
+    */
+    
     // Create flow controller with enhanced configuration
     const flowController = new FlowController({
       ...this.config,
       adaptiveChunkSize: true,
-      maxChunkSize: 1024,
-      minChunkSize: 16
+      maxChunkSize: 65536,  // 64KB max chunk size for large pastes
+      minChunkSize: 64,     // 64 bytes min chunk size
+      callback: (data) => {
+        processInfo.ptyWrapper.write(data);
+      }
     });
     this.flowControllers.set(id, flowController);
     
@@ -384,6 +395,12 @@ process.on('SIGWINCH', () => {
       return;
     }
     
+    // Debug bracketed paste sequences
+    if (data.includes('\x1b[200~') || data.includes('\x1b[201~')) {
+      const bytes = Array.from(Buffer.from(data)).map(b => `0x${b.toString(16).padStart(2, '0')}`);
+      console.log(`[PtyService] Sending paste sequence:`, bytes.join(' '));
+    }
+    
     // Send input to monitor window if available
     if (global.monitorWindow) {
       global.monitorWindow.sendData(id, 'input', data);
@@ -535,11 +552,29 @@ class DataBufferer {
     this.callback = callback;
     this.patternDetector = patternDetector;
     this.commandFormatter = commandFormatter;
+    this.claudePasteState = {
+      isActive: false,
+      detectedAt: 0,
+      endMarkerSeen: false
+    };
   }
   
   write(data) {
-    console.log(`[DataBufferer] write called: id=${this.id}, data length=${data.length}`);
     let text = data.toString('utf8');
+    
+    // Simple logging for debugging
+    if (text.includes('Pasting') || text.includes('pasting')) {
+      console.log(`[DataBufferer] Claude paste message detected: "${text.trim()}"`);
+    }
+    
+    // Just remove the [201~] if it appears in output (cleanup)
+    if (text.includes('[201~')) {
+      console.warn(`[DataBufferer] Cleaning up stray paste end marker`);
+      text = text.replace(/\[201~/g, '');
+      if (!text.trim()) {
+        return; // Don't display if only the marker was in output
+      }
+    }
     
     // Apply command formatting if active
     if (this.commandFormatter) {
@@ -579,13 +614,31 @@ class FlowController {
   }
   
   write(data, callback) {
-    // Adaptive chunk size based on performance
-    if (this.adaptiveChunkSize) {
-      this.adjustChunkSize();
+    // Debug logging
+    console.log(`[FlowController] Write request: ${data.length} bytes, chunk size: ${this.currentChunkSize}`);
+    
+    // Check for bracketed paste
+    const hasPasteStart = data.includes('\x1b[200~');
+    const hasPasteEnd = data.includes('\x1b[201~');
+    
+    if (hasPasteStart || hasPasteEnd) {
+      console.log('[FlowController] Bracketed paste detected - sending without chunking');
+      console.log(`[FlowController] Has start: ${hasPasteStart}, Has end: ${hasPasteEnd}`);
     }
     
-    // For large inputs, chunk them
-    if (data.length > this.currentChunkSize) {
+    // CRITICAL: Never chunk bracketed paste data
+    // Claude Code needs to receive the complete paste sequence
+    if (hasPasteStart && hasPasteEnd) {
+      // Complete bracketed paste - send as single chunk
+      console.log('[FlowController] Complete bracketed paste - sending as single chunk');
+      this.queue.push({ data, callback, timestamp: Date.now() });
+    } else if (hasPasteStart || hasPasteEnd) {
+      // Partial bracketed paste - still send as single chunk
+      console.warn('[FlowController] Partial bracketed paste markers - sending as single chunk');
+      this.queue.push({ data, callback, timestamp: Date.now() });
+    } else if (data.length > this.currentChunkSize) {
+      // Non-paste data - can be chunked
+      console.log(`[FlowController] Chunking non-paste data: ${data.length} bytes into ${Math.ceil(data.length / this.currentChunkSize)} chunks`);
       for (let i = 0; i < data.length; i += this.currentChunkSize) {
         this.queue.push({
           data: data.slice(i, i + this.currentChunkSize),
@@ -594,9 +647,11 @@ class FlowController {
         });
       }
     } else {
+      // Small data - send as is
       this.queue.push({ data, callback, timestamp: Date.now() });
     }
     
+    console.log(`[FlowController] Queue size: ${this.queue.length}`);
     this.processQueue();
   }
   

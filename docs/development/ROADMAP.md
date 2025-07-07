@@ -128,6 +128,7 @@ VS CodeとxtermのソースコードとZeamiTermの比較分析に基づいて�
 - ポート検出とアクション提案
 - エラー回復の提案
 - Zeami CLIとの深い統合
+- メッセージルーター＆自律開発支援（詳細: [MESSAGE_ROUTER_AND_AUTONOMOUS_DEV_SPEC.md](../specifications/MESSAGE_ROUTER_AND_AUTONOMOUS_DEV_SPEC.md)）
 
 ## Phase 6: 先進機能（2025 Q4）
 

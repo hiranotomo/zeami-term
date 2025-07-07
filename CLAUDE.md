@@ -126,6 +126,7 @@ npm run lint
 
 ### Phase 5: 高度な機能 (将来)
 - [ ] AIパワードコマンド提案
+- [ ] メッセージルーター＆自律開発支援（[詳細仕様](docs/specifications/MESSAGE_ROUTER_AND_AUTONOMOUS_DEV_SPEC.md)）
 - [ ] 画像/グラフィックスサポート（Sixel、iTerm2）
 - [ ] ターミナルリプレイ
 - [ ] 高度な統合機能（デバッガー、エディター）
