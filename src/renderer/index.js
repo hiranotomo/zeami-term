@@ -1,12 +1,16 @@
 // Import ZeamiTermManager
 import { ZeamiTermManager } from './core/ZeamiTermManager.js';
 import { pasteDebugger } from './utils/PasteDebugger.js';
+import { keyboardShortcutHelp } from './components/KeyboardShortcutHelp.js';
+import KeyboardShortcuts from './utils/KeyboardShortcuts.js';
 
 // Create and initialize manager
 const manager = new ZeamiTermManager();
+window.zeamiTermManager = manager; // Make it globally accessible
 
-// Show debug instructions
-console.log('[ZeamiTerm] Press Ctrl+Shift+P to toggle paste debugger');
+// Show debug instructions with OS-specific shortcut
+const debugShortcut = KeyboardShortcuts.getShortcuts().pasteDebugger;
+console.log(`[ZeamiTerm] Press ${debugShortcut} to toggle paste debugger`);
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {

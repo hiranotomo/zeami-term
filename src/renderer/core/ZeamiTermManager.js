@@ -19,6 +19,7 @@ import { SimpleLayoutManager } from './SimpleLayoutManager.js';
 import { ShellIntegrationSetup } from '../components/ShellIntegrationSetup.js';
 import { FileExplorer } from '../components/FileExplorer.js';
 import { pasteDebugger } from '../utils/PasteDebugger.js';
+import KeyboardShortcuts from '../utils/KeyboardShortcuts.js';
 
 export class ZeamiTermManager {
   constructor() {
@@ -300,6 +301,24 @@ export class ZeamiTermManager {
           return false; // Prevent sending Ctrl+C to terminal when text is selected
         }
       }
+      
+      
+      // Handle newline insertion: Option+Return (Mac) or Shift+Return (all platforms)
+      if (event.key === 'Enter' && (event.altKey || event.shiftKey)) {
+        // Only handle keydown events to prevent double processing
+        if (event.type !== 'keydown') {
+          return false;
+        }
+        
+        console.log('[ZeamiTermManager] Handling newline with Alt/Shift+Enter');
+        // Send a literal newline to the terminal
+        // Use the terminal's _handleData method directly
+        if (terminal._handleData) {
+          terminal._handleData('\n');
+        }
+        return false; // Prevent default handling
+      }
+      
       return true; // Allow other key events
     });
     
@@ -852,6 +871,12 @@ export class ZeamiTermManager {
             setTimeout(() => {
               terminal.write('\r\x1b[K'); // Clear the blinking cursor
               terminal.writeln('Type \x1b[1;33mhelp\x1b[0m for available commands or \x1b[1;33m?\x1b[0m for menu.');
+              
+              // Show OS-specific keyboard shortcuts
+              const shortcuts = KeyboardShortcuts.getShortcuts();
+              const modKey = KeyboardShortcuts.getModifierKey();
+              terminal.writeln(`\x1b[2mKeyboard shortcuts: ${shortcuts.copy} copy, ${shortcuts.paste} paste, ${shortcuts.pasteDebugger} debug\x1b[0m`);
+              terminal.writeln(`\x1b[2mFor newline: ${KeyboardShortcuts.isMac() ? 'Option' : 'Alt'}+Return or Shift+Return\x1b[0m`);
               terminal.writeln('');
             }, 800);
           }, 200);
@@ -1097,6 +1122,12 @@ export class ZeamiTermManager {
           case 'find':
             this.toggleSearch();
             break;
+          case 'paste':
+            this.handleMenuPaste();
+            break;
+          case 'custom-paste':
+            this.handleCustomPaste();
+            break;
           default:
             console.warn('[ZeamiTermManager] Unknown menu action:', action);
         }
@@ -1169,6 +1200,98 @@ export class ZeamiTermManager {
     // Use the SaveCommand execute method
     const saveCommand = new SaveCommand();
     await saveCommand.execute(activeTerminal, []);
+  }
+  
+  async handleCustomPaste() {
+    const activeTerminal = this.getActiveTerminal();
+    if (!activeTerminal) {
+      console.warn('[ZeamiTermManager] No active terminal for paste');
+      return;
+    }
+    
+    try {
+      // Check clipboard for images
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          if (item.types.includes('image/png') || item.types.includes('image/jpeg')) {
+            // Found an image, send Ctrl+V to trigger Claude Code's image handling
+            console.log('[ZeamiTermManager] Image detected in clipboard, sending Ctrl+V');
+            if (activeTerminal._handleData) {
+              activeTerminal._handleData('\x16'); // Ctrl+V
+            }
+            return;
+          }
+        }
+      }
+      
+      // No image found or clipboard API not available, paste text
+      if (activeTerminal.paste && navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          activeTerminal.paste(text);
+        }
+      }
+    } catch (error) {
+      console.error('[ZeamiTermManager] Failed to handle custom paste:', error);
+    }
+  }
+  
+  async handleMenuPaste() {
+    const activeTerminal = this.getActiveTerminal();
+    if (!activeTerminal) {
+      console.warn('[ZeamiTermManager] No active terminal for paste');
+      return;
+    }
+    
+    try {
+      // Get the terminal's textarea element
+      const textarea = activeTerminal.textarea;
+      if (!textarea) {
+        console.warn('[ZeamiTermManager] No textarea found for paste');
+        return;
+      }
+      
+      // Focus the textarea
+      textarea.focus();
+      
+      // Use the terminal's paste method directly if available
+      if (activeTerminal.paste && typeof activeTerminal.paste === 'function') {
+        // Try to read clipboard and paste
+        navigator.clipboard.read().then(items => {
+          console.log('[ZeamiTermManager] Clipboard items:', items.length);
+          
+          // Check for images first
+          for (const item of items) {
+            console.log('[ZeamiTermManager] Item types:', item.types);
+            if (item.types.includes('image/png') || item.types.includes('image/jpeg')) {
+              // This is an image, but xterm.js paste only handles text
+              // So we need to let the browser handle it naturally
+              document.execCommand('paste');
+              return;
+            }
+          }
+          
+          // If no images, try text paste
+          navigator.clipboard.readText().then(text => {
+            if (text) {
+              activeTerminal.paste(text);
+            }
+          });
+        }).catch(err => {
+          console.error('[ZeamiTermManager] Clipboard read failed:', err);
+          // Fallback to execCommand
+          document.execCommand('paste');
+        });
+      } else {
+        // Fallback to execCommand
+        document.execCommand('paste');
+      }
+      
+      console.log('[ZeamiTermManager] Menu paste executed');
+    } catch (error) {
+      console.error('[ZeamiTermManager] Failed to handle menu paste:', error);
+    }
   }
   
   getActiveSession() {

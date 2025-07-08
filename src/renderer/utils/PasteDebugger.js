@@ -50,12 +50,21 @@ export class PasteDebugger {
     
     document.body.appendChild(panel);
     
-    // Toggle with keyboard shortcut (Ctrl+Shift+P)
+    // Toggle with keyboard shortcut (Cmd+Shift+P on Mac, Ctrl+Shift+P on others)
     document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+      const isMac = navigator.platform.toLowerCase().includes('mac');
+      const modifierPressed = isMac ? e.metaKey : e.ctrlKey;
+      if (modifierPressed && e.shiftKey && e.key === 'P') {
         this.toggle();
       }
     });
+    
+    // Add helpful hint about paste
+    const hint = document.createElement('div');
+    hint.style.cssText = 'margin-top: 10px; font-size: 10px; color: #888;';
+    const isMac = navigator.platform.toLowerCase().includes('mac');
+    hint.textContent = `画像をペースト: ${isMac ? 'Cmd+V' : 'Ctrl+V'}`;
+    panel.appendChild(hint);
     
     // Close button
     document.getElementById('paste-debug-close').addEventListener('click', () => {
@@ -76,7 +85,11 @@ export class PasteDebugger {
     document.getElementById('paste-debug-panel').style.display = 'block';
     // Add initial message if no events
     if (this.events.length === 0) {
-      this.log('info', 'Paste debugger started. Waiting for paste events...');
+      const isMac = navigator.platform.toLowerCase().includes('mac');
+      const pasteShortcut = isMac ? 'Cmd+V' : 'Ctrl+V';
+      const toggleShortcut = isMac ? 'Cmd+Shift+P' : 'Ctrl+Shift+P';
+      this.log('info', `Paste debugger started. Use ${pasteShortcut} to paste, ${toggleShortcut} to toggle this panel.`);
+      this.log('info', 'For newlines in terminal: Option+Return or Shift+Return');
     }
     this.updateDisplay();
   }

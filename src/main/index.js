@@ -702,7 +702,17 @@ function createApplicationMenu() {
         { type: 'separator' },
         { label: '切り取り', accelerator: 'CmdOrCtrl+X', role: 'cut' },
         { label: 'コピー', accelerator: 'CmdOrCtrl+C', role: 'copy' },
-        { label: '貼り付け', accelerator: 'CmdOrCtrl+V', role: 'paste' },
+        { 
+          label: '貼り付け', 
+          accelerator: 'CmdOrCtrl+V',
+          click: async (menuItem, browserWindow) => {
+            const window = browserWindow || BrowserWindow.getFocusedWindow();
+            if (window && !window.isDestroyed()) {
+              // Send a custom event to renderer to handle paste
+              window.webContents.send('menu-action', 'custom-paste');
+            }
+          }
+        },
         { label: 'すべて選択', accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
         { type: 'separator' },
         { 
