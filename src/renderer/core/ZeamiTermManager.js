@@ -238,7 +238,7 @@ export class ZeamiTermManager {
       tabStopWidth: terminalPrefs.tabStopWidth,
       bellStyle: terminalPrefs.bellStyle,
       // Important for Claude Code compatibility
-      convertEol: true,  // Convert CRLF to LF
+      convertEol: false,  // Don't convert CR/LF - needed for Claude Code status updates
       windowsMode: false, // Use Unix-style line endings
       macOptionIsMeta: true, // Mac Option key as Meta
       allowProposedApi: true, // Enable proposed APIs

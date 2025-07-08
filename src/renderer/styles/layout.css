@@ -252,6 +252,19 @@
   left: auto !important;
   right: auto !important;
   bottom: auto !important;
+  /* Fix stacking context issue in split mode */
+  isolation: isolate;
+}
+
+/* Fix overlay interference in split mode */
+.layout-split-container .terminal-wrapper::before {
+  z-index: 1; /* Lower z-index in split mode */
+}
+
+/* Ensure xterm content is above overlay in split mode */
+.layout-split-container .terminal-wrapper .xterm {
+  position: relative;
+  z-index: 2;
 }
 
 /* Animation for layout changes */

@@ -439,6 +439,7 @@ export class LayoutManager {
    */
   resizeVisibleTerminals() {
     // Use setTimeout to ensure DOM has updated
+    // Increased initial delay to allow layout to stabilize
     setTimeout(() => {
       this.terminalNodeMap.forEach((node, terminalId) => {
         const wrapper = node.wrapper;
