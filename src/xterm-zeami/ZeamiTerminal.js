@@ -68,8 +68,13 @@ export class ZeamiTerminal extends window.Terminal {
   _handleData(data) {
     console.log('[ZeamiTerminal] _handleData:', data.length, 'bytes');
     
+    // Debug: Log first 50 chars to see what data we're getting
+    console.log('[ZeamiTerminal] Data preview:', data.substring(0, 50).replace(/\x1b/g, 'ESC'));
+    
     const hasStartMarker = data.includes('\x1b[200~');
     const hasEndMarker = data.includes('\x1b[201~');
+    
+    console.log('[ZeamiTerminal] Markers check - Start:', hasStartMarker, 'End:', hasEndMarker);
     
     // CRITICAL: Handle bracketed paste specially for Claude Code
     if (hasStartMarker || hasEndMarker) {
