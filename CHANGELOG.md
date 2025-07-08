@@ -2,6 +2,16 @@
 
 All notable changes to ZeamiTerm will be documented in this file.
 
+## [0.1.8] - 2025-01-08
+
+### Fixed
+- **CRITICAL**: Fixed initialization infinite loop caused by paste handler being set before PTY connection
+- Moved paste handler setup to after PTY process is established
+
+### Technical Details
+- onPaste handler now properly waits for session.process to exist before setup
+- Prevents null reference errors during terminal initialization
+
 ## [0.1.7] - 2025-01-08
 
 ### Fixed

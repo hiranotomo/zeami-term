@@ -250,96 +250,7 @@ export class ZeamiTermManager {
     // Open terminal in wrapper
     terminal.open(wrapper);
     
-    // Handle paste events with dynamic chunking
-    terminal.onPaste((data) => {
-      console.log('[ZeamiTermManager] onPaste intercepted:', data.length, 'chars');
-      
-      // Analyze content to determine optimal chunking strategy
-      const lineCount = data.split('\n').length;
-      const contentLength = data.length;
-      
-      console.log(`[ZeamiTermManager] Paste content analysis: ${lineCount} lines, ${contentLength} chars`);
-      
-      // For paste events, we need to handle timing and chunking properly
-      if (session.process) {
-        const api = window.electronAPI || window.zeamiAPI;
-        
-        // 1. Send start marker
-        if (window.electronAPI) {
-          window.electronAPI.sendInput(session.process.id, '\x1b[200~');
-        } else {
-          window.zeamiAPI.sendInput(session.process.sessionId, '\x1b[200~');
-        }
-        console.log('[ZeamiTermManager] Sent START marker from onPaste');
-        
-        // 2. Send content in chunks after delay
-        setTimeout(() => {
-          // Dynamic chunking based on content size
-          let CHUNK_SIZE;
-          let CHUNK_DELAY;
-          
-          if (lineCount >= 30 && lineCount < 50) {
-            // Medium content: optimize for [Pasted text] display
-            CHUNK_SIZE = 500; // Smaller chunks
-            const targetTotalTime = 60; // Target 60ms total time
-            const estimatedChunks = Math.ceil(contentLength / CHUNK_SIZE);
-            CHUNK_DELAY = Math.max(15, Math.floor(targetTotalTime / estimatedChunks));
-            
-            console.log(`[ZeamiTermManager] Medium content strategy: ${CHUNK_SIZE} char chunks, ${CHUNK_DELAY}ms delay`);
-          } else {
-            // Original settings for small or large content
-            CHUNK_SIZE = 1000;
-            CHUNK_DELAY = 10;
-            
-            console.log(`[ZeamiTermManager] Standard strategy: ${CHUNK_SIZE} char chunks, ${CHUNK_DELAY}ms delay`);
-          }
-          
-          // Create chunks
-          const chunks = [];
-          for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-            chunks.push(data.substring(i, i + CHUNK_SIZE));
-          }
-          
-          console.log(`[ZeamiTermManager] Sending content in ${chunks.length} chunks`);
-          
-          // Send chunks with calculated delays
-          let chunkIndex = 0;
-          const startTime = Date.now();
-          
-          const sendNextChunk = () => {
-            if (chunkIndex < chunks.length) {
-              if (window.electronAPI) {
-                window.electronAPI.sendInput(session.process.id, chunks[chunkIndex]);
-              } else {
-                window.zeamiAPI.sendInput(session.process.sessionId, chunks[chunkIndex]);
-              }
-              console.log(`[ZeamiTermManager] Sent chunk ${chunkIndex + 1}/${chunks.length}: ${chunks[chunkIndex].length} chars`);
-              chunkIndex++;
-              setTimeout(sendNextChunk, CHUNK_DELAY);
-            } else {
-              // All chunks sent, log total time
-              const totalTime = Date.now() - startTime;
-              console.log(`[ZeamiTermManager] All chunks sent in ${totalTime}ms`);
-              
-              // Send end marker
-              setTimeout(() => {
-                if (window.electronAPI) {
-                  window.electronAPI.sendInput(session.process.id, '\x1b[201~');
-                } else {
-                  window.zeamiAPI.sendInput(session.process.sessionId, '\x1b[201~');
-                }
-                console.log('[ZeamiTermManager] Sent END marker from onPaste');
-              }, 50); // Wait before end marker
-            }
-          };
-          
-          sendNextChunk();
-        }, 200); // Critical delay for Claude Code
-      }
-      
-      // Return false to prevent default handling
-      return false;
-    });
+    // Paste handler will be set up after PTY connection
     
     // Enable bracketed paste mode to ensure Claude Code can detect paste events
     // Send CSI ? 2004 h (set bracketed paste mode)
@@ -747,6 +658,97 @@ export class ZeamiTermManager {
             }
           }
         }
+        
+        // Set up paste handler now that we have process info
+        session.terminal.onPaste((data) => {
+          console.log('[ZeamiTermManager] onPaste intercepted:', data.length, 'chars');
+          
+          // Analyze content to determine optimal chunking strategy
+          const lineCount = data.split('\n').length;
+          const contentLength = data.length;
+          
+          console.log(`[ZeamiTermManager] Paste content analysis: ${lineCount} lines, ${contentLength} chars`);
+          
+          // For paste events, we need to handle timing and chunking properly
+          if (session.process) {
+            const api = window.electronAPI || window.zeamiAPI;
+            
+            // 1. Send start marker
+            if (window.electronAPI) {
+              window.electronAPI.sendInput(session.process.id, '\x1b[200~');
+            } else {
+              window.zeamiAPI.sendInput(session.process.sessionId, '\x1b[200~');
+            }
+            console.log('[ZeamiTermManager] Sent START marker from onPaste');
+            
+            // 2. Send content in chunks after delay
+            setTimeout(() => {
+              // Dynamic chunking based on content size
+              let CHUNK_SIZE;
+              let CHUNK_DELAY;
+              
+              if (lineCount >= 30 && lineCount < 50) {
+                // Medium content: optimize for [Pasted text] display
+                CHUNK_SIZE = 500; // Smaller chunks
+                const targetTotalTime = 60; // Target 60ms total time
+                const estimatedChunks = Math.ceil(contentLength / CHUNK_SIZE);
+                CHUNK_DELAY = Math.max(15, Math.floor(targetTotalTime / estimatedChunks));
+                
+                console.log(`[ZeamiTermManager] Medium content strategy: ${CHUNK_SIZE} char chunks, ${CHUNK_DELAY}ms delay`);
+              } else {
+                // Original settings for small or large content
+                CHUNK_SIZE = 1000;
+                CHUNK_DELAY = 10;
+                
+                console.log(`[ZeamiTermManager] Standard strategy: ${CHUNK_SIZE} char chunks, ${CHUNK_DELAY}ms delay`);
+              }
+              
+              // Create chunks
+              const chunks = [];
+              for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+                chunks.push(data.substring(i, i + CHUNK_SIZE));
+              }
+              
+              console.log(`[ZeamiTermManager] Sending content in ${chunks.length} chunks`);
+              
+              // Send chunks with calculated delays
+              let chunkIndex = 0;
+              const startTime = Date.now();
+              
+              const sendNextChunk = () => {
+                if (chunkIndex < chunks.length) {
+                  if (window.electronAPI) {
+                    window.electronAPI.sendInput(session.process.id, chunks[chunkIndex]);
+                  } else {
+                    window.zeamiAPI.sendInput(session.process.sessionId, chunks[chunkIndex]);
+                  }
+                  console.log(`[ZeamiTermManager] Sent chunk ${chunkIndex + 1}/${chunks.length}: ${chunks[chunkIndex].length} chars`);
+                  chunkIndex++;
+                  setTimeout(sendNextChunk, CHUNK_DELAY);
+                } else {
+                  // All chunks sent, log total time
+                  const totalTime = Date.now() - startTime;
+                  console.log(`[ZeamiTermManager] All chunks sent in ${totalTime}ms`);
+                  
+                  // Send end marker
+                  setTimeout(() => {
+                    if (window.electronAPI) {
+                      window.electronAPI.sendInput(session.process.id, '\x1b[201~');
+                    } else {
+                      window.zeamiAPI.sendInput(session.process.sessionId, '\x1b[201~');
+                    }
+                    console.log('[ZeamiTermManager] Sent END marker from onPaste');
+                  }, 50); // Wait before end marker
+                }
+              };
+              
+              sendNextChunk();
+            }, 200); // Critical delay for Claude Code
+          }
+          
+          // Return false to prevent default handling
+          return false;
+        });
         
         // Set PTY handler for user input
         session.terminal.setPtyHandler((data) => {
