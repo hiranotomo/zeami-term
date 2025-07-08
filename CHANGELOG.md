@@ -2,6 +2,23 @@
 
 All notable changes to ZeamiTerm will be documented in this file.
 
+## [0.1.9] - 2025-01-08
+
+### Fixed
+- Fixed "onPaste is not a function" error by removing dependency on xterm.js onPaste API
+- Implemented dynamic paste configuration through ZeamiTerminal's internal _handleData method
+- Terminal now starts properly without errors
+
+### Improved
+- Added comprehensive build documentation (BUILD_RULES.md)
+- Dynamic paste chunking configuration is now passed from ZeamiTermManager to ZeamiTerminal
+- Better error handling for xterm.js API compatibility
+
+### Technical Details
+- Removed direct usage of terminal.onPaste() which may not be available in all builds
+- Configuration object approach: `_dynamicPasteConfig` passed to ZeamiTerminal instance
+- Maintained all paste optimization features from v0.1.7
+
 ## [0.1.8] - 2025-01-08
 
 ### Fixed

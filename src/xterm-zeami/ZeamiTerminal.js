@@ -105,26 +105,53 @@ export class ZeamiTerminal extends window.Terminal {
         
         // 2. Send content in chunks after delay
         setTimeout(() => {
-          // For large content, send in smaller chunks
-          const CHUNK_SIZE = 1000; // 1000 chars per chunk
-          const chunks = [];
+          // Analyze content for optimal chunking strategy
+          const lineCount = content.split('\n').length;
+          const contentLength = content.length;
           
+          console.log(`[ZeamiTerminal] Content analysis: ${lineCount} lines, ${contentLength} chars`);
+          
+          // Use dynamic config if available
+          const config = this._dynamicPasteConfig || {};
+          let CHUNK_SIZE;
+          let CHUNK_DELAY;
+          
+          if (config.enabled && 
+              lineCount >= (config.mediumContentLines?.min || 30) && 
+              lineCount < (config.mediumContentLines?.max || 50)) {
+            // Medium content: optimize for [Pasted text] display
+            CHUNK_SIZE = config.mediumChunkSize || 500;
+            const targetTotalTime = config.targetTotalTime || 60;
+            const estimatedChunks = Math.ceil(contentLength / CHUNK_SIZE);
+            CHUNK_DELAY = Math.max(config.mediumChunkDelay || 15, Math.floor(targetTotalTime / estimatedChunks));
+            
+            console.log(`[ZeamiTerminal] Medium content strategy: ${CHUNK_SIZE} char chunks, ${CHUNK_DELAY}ms delay`);
+          } else {
+            // Standard settings
+            CHUNK_SIZE = config.standardChunkSize || 1000;
+            CHUNK_DELAY = config.chunkDelay || 10;
+            
+            console.log(`[ZeamiTerminal] Standard strategy: ${CHUNK_SIZE} char chunks, ${CHUNK_DELAY}ms delay`);
+          }
+          
+          // Create chunks
+          const chunks = [];
           for (let i = 0; i < content.length; i += CHUNK_SIZE) {
             chunks.push(content.substring(i, i + CHUNK_SIZE));
           }
           
           console.log(`[ZeamiTerminal] Sending content in ${chunks.length} chunks`);
           
-          // Send chunks with small delays
+          // Send chunks with calculated delays
           let chunkIndex = 0;
           const sendNextChunk = () => {
             if (chunkIndex < chunks.length) {
               this._ptyHandler(chunks[chunkIndex]);
               console.log(`[ZeamiTerminal] Sent chunk ${chunkIndex + 1}/${chunks.length}: ${chunks[chunkIndex].length} chars`);
               chunkIndex++;
-              setTimeout(sendNextChunk, 10); // 10ms between chunks
+              setTimeout(sendNextChunk, CHUNK_DELAY);
             } else {
-              // All chunks sent, now send end marker
+              // All chunks sent, send end marker
               setTimeout(() => {
                 this._ptyHandler('\x1b[201~');
                 console.log('[ZeamiTerminal] Sent END marker');
@@ -133,7 +160,7 @@ export class ZeamiTerminal extends window.Terminal {
           };
           
           sendNextChunk();
-        }, 200); // Increased delay after start marker to ensure Claude Code enters paste mode
+        }, 200); // Critical delay for Claude Code
       }
       
       return; // Don't process further
