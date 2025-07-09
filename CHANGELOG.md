@@ -2,6 +2,33 @@
 
 All notable changes to ZeamiTerm will be documented in this file.
 
+## [0.1.12] - 2025-01-09
+
+### Added
+- Enhanced startup animation with Japanese katakana matrix rain effect
+- Glitch transition effect between animation phases
+- Gradient color effects and pulsing animations
+- PTY output buffering during startup animation
+- Automatic centering of logo based on terminal size
+
+### Fixed
+- Fixed startup logo being interrupted by terminal output
+- Resolved initialization infinite loop issues
+- Fixed undefined session variable errors
+- Improved initialization timing for Terminal A and B
+
+### Improved
+- Redesigned compact logo that fits within terminal width
+- Optimized message display timing and sequencing
+- Enhanced visual effects with multiple animation layers
+- Better separation of animation and terminal output
+
+### Technical Details
+- Implemented output buffering system for clean animation display
+- Added dynamic terminal size calculation for initial dimensions
+- Fixed bracketed paste mode initialization timing
+- Improved startup sequence with proper async handling
+
 ## [0.1.11] - 2025-01-09
 
 ### Fixed

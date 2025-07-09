@@ -212,7 +212,7 @@ class StartupAnimation {
     this.terminal.write(this.colors.reset + '\r\n');
     
     // Version and tagline with pulsing effect
-    const version = 'TERMINAL v0.1.11';
+    const version = 'TERMINAL v0.1.12';
     const tagline = '(C) 2025 TELEPORT COMPANY, LTD.';
     const subtitle = 'ALL RIGHTS RESERVED';
     
