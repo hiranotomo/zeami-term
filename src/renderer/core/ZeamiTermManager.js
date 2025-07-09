@@ -20,6 +20,7 @@ import { ShellIntegrationSetup } from '../components/ShellIntegrationSetup.js';
 import { FileExplorer } from '../components/FileExplorer.js';
 import { pasteDebugger } from '../utils/PasteDebugger.js';
 import KeyboardShortcuts from '../utils/KeyboardShortcuts.js';
+import { LogPanel } from '../components/LogPanel.js';
 
 export class ZeamiTermManager {
   constructor() {
@@ -107,6 +108,10 @@ export class ZeamiTermManager {
     // Initialize file explorer
     this.fileExplorer = new FileExplorer(this);
     this.fileExplorer.init();
+    
+    // Initialize log panel
+    this.logPanel = new LogPanel();
+    console.log('[ZeamiTermManager] Log panel initialized');
     
     // Load saved sessions
     this.sessionPersistence.loadFromStorage();
@@ -456,33 +461,7 @@ export class ZeamiTermManager {
     });
     resizeObserver.observe(wrapper);
     
-    // Create session
-    const session = {
-      id,
-      terminal,
-      fitAddon,
-      searchAddon,
-      shellIntegrationAddon,
-      enhancedLinkProvider,
-      webLinksAddon,
-      rendererAddon,
-      process: null,
-      title: options.name || `Terminal ${this.terminalCounter}`,
-      searchDecorations: [],
-      wrapper,
-      cwd: options.cwd || null,
-      fixedId: options.id // Store fixed ID for Terminal A/B
-    };
-    
-    this.terminals.set(id, session);
-    
-    // Only set as active if it's the first terminal or explicitly requested
-    if (!this.activeTerminalId || options.activate) {
-      this.activeTerminalId = id;
-      wrapper.classList.add('active');
-    } else {
-      wrapper.classList.add('inactive');
-    }
+    // Session already created above
     
     
     // Configure search decorations after session is created
@@ -594,6 +573,34 @@ export class ZeamiTermManager {
       session.terminal.writeln('ZeamiTerm - Terminal API not available');
       session.terminal.writeln('Running in demo mode\r\n');
       return;
+    }
+    
+    // Create session object first
+    const session = {
+      id,
+      terminal,
+      fitAddon,
+      searchAddon,
+      shellIntegrationAddon,
+      enhancedLinkProvider,
+      webLinksAddon,
+      rendererAddon,
+      process: null,
+      title: options.name || `Terminal ${this.terminalCounter}`,
+      searchDecorations: [],
+      wrapper,
+      cwd: options.cwd || null,
+      fixedId: options.id // Store fixed ID for Terminal A/B
+    };
+    
+    this.terminals.set(id, session);
+    
+    // Only set as active if it's the first terminal or explicitly requested
+    if (!this.activeTerminalId || options.activate) {
+      this.activeTerminalId = id;
+      wrapper.classList.add('active');
+    } else {
+      wrapper.classList.add('inactive');
     }
     
     try {

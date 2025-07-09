@@ -33,22 +33,37 @@ export class SimpleLayoutManager {
     
     // Create Tab button
     const tabBtn = document.createElement('button');
-    tabBtn.className = 'toggle-button active';
-    tabBtn.textContent = 'Tab';
+    tabBtn.className = 'toggle-button icon-button active';
+    tabBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5v-11zm1.5 0v11h11v-11h-11z"/>
+        <path d="M3 4h10v1H3V4zm0 2h10v7H3V6z"/>
+      </svg>
+    `;
     tabBtn.title = 'タブモード - 一度に1つのターミナルを表示';
     tabBtn.addEventListener('click', () => this.setMode('tab'));
     
     // Create Horizontal button
     const horizontalBtn = document.createElement('button');
-    horizontalBtn.className = 'toggle-button';
-    horizontalBtn.textContent = 'Horizontal';
+    horizontalBtn.className = 'toggle-button icon-button';
+    horizontalBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm0 1h12v5.5H2V2zm0 6.5h12V14H2V8.5z"/>
+        <path d="M1.5 7.5h13v1h-13v-1z" opacity="0.5"/>
+      </svg>
+    `;
     horizontalBtn.title = '水平分割 - 上下に2つのターミナルを表示';
     horizontalBtn.addEventListener('click', () => this.setMode('split-horizontal'));
     
     // Create Vertical button
     const verticalBtn = document.createElement('button');
-    verticalBtn.className = 'toggle-button';
-    verticalBtn.textContent = 'Vertical';
+    verticalBtn.className = 'toggle-button icon-button';
+    verticalBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm0 1h5.5v12H2V2zm6.5 0H14v12H8.5V2z"/>
+        <path d="M7.5 1.5v13h1v-13h-1z" opacity="0.5"/>
+      </svg>
+    `;
     verticalBtn.title = '垂直分割 - 左右に2つのターミナルを表示';
     verticalBtn.addEventListener('click', () => this.setMode('split-vertical'));
     
