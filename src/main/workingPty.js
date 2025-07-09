@@ -74,6 +74,21 @@ def set_size(fd, rows, cols):
     size = struct.pack('HHHH', rows, cols, 0, 0)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
 
+# Global variable to store master_fd for resize handling
+master_fd_global = None
+
+def handle_usr1(signum, frame):
+    """Handle SIGUSR1 signal to read and apply new terminal size"""
+    global master_fd_global
+    if master_fd_global:
+        try:
+            # Read resize info from environment variables
+            cols = int(os.environ.get('ZEAMI_RESIZE_COLS', '80'))
+            rows = int(os.environ.get('ZEAMI_RESIZE_ROWS', '30'))
+            set_size(master_fd_global, rows, cols)
+        except:
+            pass
+
 def main():
     shell = sys.argv[1] if len(sys.argv) > 1 else '/bin/bash'
     
@@ -117,6 +132,13 @@ def main():
     else:  # Parent
         os.close(slave_fd)
         
+        # Store master_fd globally for resize handling
+        global master_fd_global
+        master_fd_global = master_fd
+        
+        # Set up SIGUSR1 handler for resize
+        signal.signal(signal.SIGUSR1, handle_usr1)
+        
         # Note: Master PTY attributes are usually handled by the slave side
         # We don't need to set attributes on the master FD
         # The shell process will handle echo and other terminal settings
@@ -156,8 +178,23 @@ def main():
                             # Read available data (up to 65536 bytes for large pastes)
                             data = os.read(sys.stdin.fileno(), 65536)
                             if data:
-                                # Write immediately to PTY
-                                os.write(master_fd, data)
+                                # Check for resize command
+                                data_str = data.decode('utf-8', errors='ignore')
+                                if data_str.startswith('RESIZE:'):
+                                    # Parse resize command
+                                    parts = data_str.strip().split(':')
+                                    if len(parts) == 3:
+                                        try:
+                                            new_cols = int(parts[1])
+                                            new_rows = int(parts[2])
+                                            set_size(master_fd, new_rows, new_cols)
+                                            # Send SIGWINCH to the shell
+                                            os.kill(pid, signal.SIGWINCH)
+                                        except:
+                                            pass
+                                else:
+                                    # Write normal data to PTY
+                                    os.write(master_fd, data)
                         except OSError as e:
                             if e.errno != 11:  # Ignore EAGAIN
                                 pass
@@ -268,13 +305,15 @@ if __name__ == '__main__':
     this.cols = cols;
     this.rows = rows;
     
-    // TODO: Implement resize via signal to Python script
     if (this.process && this.isRunning) {
-      // Send SIGWINCH to the Python process
       try {
-        process.kill(this.process.pid, 'SIGWINCH');
+        // Write resize command directly to Python process stdin
+        const resizeCmd = `RESIZE:${cols}:${rows}\n`;
+        this.process.stdin.write(resizeCmd);
+        
+        console.log(`[WorkingPty] Sent resize command: ${cols}x${rows}`);
       } catch (error) {
-        // Ignore
+        console.error('[WorkingPty] Resize error:', error);
       }
     }
   }

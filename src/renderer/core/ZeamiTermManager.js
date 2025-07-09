@@ -132,10 +132,12 @@ export class ZeamiTermManager {
     // Get window ID for terminal registration
     const windowId = await this.getWindowId();
     
-    // Create exactly 2 fixed terminals
+    // Create exactly 2 fixed terminals with default sizes to avoid resize loops
     await this.createTerminal({ 
       name: 'Terminal A', 
       id: 'terminal-a',
+      cols: 80,
+      rows: 24,
       env: { 
         ZEAMI_TERMINAL_ID: 'A', 
         ZEAMI_TERMINAL_NAME: 'Terminal A',
@@ -145,6 +147,8 @@ export class ZeamiTermManager {
     await this.createTerminal({ 
       name: 'Terminal B', 
       id: 'terminal-b',
+      cols: 80,
+      rows: 24,
       env: { 
         ZEAMI_TERMINAL_ID: 'B', 
         ZEAMI_TERMINAL_NAME: 'Terminal B',
@@ -245,7 +249,9 @@ export class ZeamiTermManager {
       screenReaderMode: false, // Disable screen reader mode for better performance
       // ENABLE bracketed paste mode for proper paste handling
       bracketedPasteMode: true,
-      ...options
+      // Set initial size
+      cols: options.cols || 80,
+      rows: options.rows || 24
     });
     
     // Open terminal in wrapper
@@ -256,20 +262,7 @@ export class ZeamiTermManager {
     
     // Enable bracketed paste mode to ensure Claude Code can detect paste events
     // Send CSI ? 2004 h (set bracketed paste mode)
-    setTimeout(() => {
-      if (session.terminal._ptyHandler) {
-        console.log('[ZeamiTermManager] Sending control sequence to ENABLE bracketed paste mode');
-        // Send CSI ? 2004 h (set bracketed paste mode)
-        session.terminal._ptyHandler('\x1b[?2004h');
-        pasteDebugger.log('info', 'Sent control sequence to ENABLE bracketed paste mode');
-        
-        // Also send a newline to ensure the command is processed
-        setTimeout(() => {
-          session.terminal._ptyHandler('\r');
-          console.log('[ZeamiTermManager] Sent newline after bracketed paste mode enable');
-        }, 50);
-      }
-    }, 500); // Increased delay to ensure terminal is ready
+    // Note: This will be done after the session is created and stored
     
     // Register builtin commands
     this.registerBuiltinCommands(terminal);
@@ -774,6 +767,22 @@ export class ZeamiTermManager {
         
         // Update status
         this.updateStatusBar(session);
+        
+        // Enable bracketed paste mode after terminal is connected
+        setTimeout(() => {
+          if (session.terminal._ptyHandler) {
+            console.log('[ZeamiTermManager] Sending control sequence to ENABLE bracketed paste mode');
+            // Send CSI ? 2004 h (set bracketed paste mode)
+            session.terminal._ptyHandler('\x1b[?2004h');
+            pasteDebugger.log('info', 'Sent control sequence to ENABLE bracketed paste mode');
+            
+            // Also send a newline to ensure the command is processed
+            setTimeout(() => {
+              session.terminal._ptyHandler('\r');
+              console.log('[ZeamiTermManager] Sent newline after bracketed paste mode enable');
+            }, 50);
+          }
+        }, 500); // Delay to ensure terminal is ready
         
         // Auto-restore last session if this is the first terminal
         if (shouldRestore) {
