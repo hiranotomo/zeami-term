@@ -9,7 +9,6 @@ const { MonitorWindow } = require('./monitorWindow');
 const { MessageCenterWindow } = require('./messageCenterWindow');
 const { MessageCenterService } = require('./services/MessageCenterService');
 const { ShellIntegrationCleaner } = require('./shellIntegrationCleaner');
-const { getLoggingService } = require('./services/LoggingService');
 // const { PreferenceManager } = require('../features/preferences/PreferenceManager');
 
 // Get version from package.json
@@ -26,7 +25,6 @@ let terminalProcessManager;
 let monitorWindow;
 let messageCenterWindow;
 let messageCenterService;
-let loggingService;
 // let preferenceManager;
 const windows = new Set();
 
@@ -66,12 +64,6 @@ function createWindow(isMain = true) {
   // Show window when ready to prevent visual flash
   window.once('ready-to-show', () => {
     window.show();
-    
-    // Register window with logging service
-    if (loggingService) {
-      loggingService.addWindow(window);
-    }
-    
     // Open dev tools in development - Enable for debugging
     // Disabled by default - use menu to open
     // if (process.env.NODE_ENV !== 'production') {
@@ -883,9 +875,6 @@ function createApplicationMenu() {
 // App event handlers
 app.whenReady().then(async () => {
   // Initialize services before creating window
-  loggingService = getLoggingService();
-  console.log('[Main] LoggingService initialized');
-  
   ptyService = new PtyService();
   console.log('[Main] PtyService initialized');
   

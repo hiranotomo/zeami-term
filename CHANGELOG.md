@@ -2,6 +2,28 @@
 
 All notable changes to ZeamiTerm will be documented in this file.
 
+## [0.1.13] - 2025-01-09
+
+### Added
+- Icon-based mode toggle buttons for Tab/Horizontal/Vertical split modes
+- Improved tab bar styling with brighter background colors
+
+### Fixed
+- Critical fix: Initialization infinite loop that prevented app from starting
+- Added proper error handling and initialization state management
+- Ensured `isInitializing` flag is properly reset in all scenarios
+
+### Improved
+- Tab bar background color changed from `#2d2d30` to `#3c3c3c` for better visibility
+- Toggle button group background updated to match the new color scheme
+- Enhanced hover states for better user feedback
+- Better error reporting in the loading screen
+
+### Technical Details
+- Added comprehensive try-catch error handling in initialization process
+- Improved initialization state management to prevent duplicate attempts
+- Removed incomplete log panel implementation that was causing issues
+
 ## [0.1.12] - 2025-01-09
 
 ### Added

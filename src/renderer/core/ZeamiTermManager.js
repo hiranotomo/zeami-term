@@ -20,7 +20,6 @@ import { ShellIntegrationSetup } from '../components/ShellIntegrationSetup.js';
 import { FileExplorer } from '../components/FileExplorer.js';
 import { pasteDebugger } from '../utils/PasteDebugger.js';
 import KeyboardShortcuts from '../utils/KeyboardShortcuts.js';
-import { LogPanel } from '../components/LogPanel.js';
 
 export class ZeamiTermManager {
   constructor() {
@@ -74,6 +73,8 @@ export class ZeamiTermManager {
     }
     this.isInitializing = true;
     
+    try {
+    
     // Make manager accessible globally for testing and addons
     window.zeamiTermManager = this;
     window.terminalManager = this;  // For backward compatibility
@@ -108,10 +109,6 @@ export class ZeamiTermManager {
     // Initialize file explorer
     this.fileExplorer = new FileExplorer(this);
     this.fileExplorer.init();
-    
-    // Initialize log panel
-    this.logPanel = new LogPanel();
-    console.log('[ZeamiTermManager] Log panel initialized');
     
     // Load saved sessions
     this.sessionPersistence.loadFromStorage();
@@ -185,6 +182,27 @@ export class ZeamiTermManager {
         }
       }
     }, 500);
+    
+    // Mark initialization as complete
+    this.isInitializing = false;
+    console.log('[ZeamiTermManager] Initialization complete');
+    
+    } catch (error) {
+      console.error('[ZeamiTermManager] Initialization failed:', error);
+      this.isInitializing = false;
+      
+      // Show error in loading screen
+      const loading = document.getElementById('loading');
+      if (loading) {
+        const message = loading.querySelector('p');
+        if (message) {
+          message.textContent = `Initialization failed: ${error.message}`;
+          message.style.color = '#ff6b6b';
+        }
+      }
+      
+      throw error;
+    }
   }
   
   async createTerminal(options = {}) {
@@ -337,8 +355,8 @@ export class ZeamiTermManager {
     // terminal.loadAddon(shellIntegrationAddon);
     const shellIntegrationAddon = null;
     
-    // Listen to shell integration events
-    terminal.onShellIntegrationEvent = (eventName, data) => {
+    // Store shell integration event handler reference to set up later
+    const shellIntegrationHandler = (eventName, data) => {
       console.log(`[ShellIntegration] ${eventName}:`, data);
       
       // Update status bar with command info
@@ -353,14 +371,18 @@ export class ZeamiTermManager {
           enhancedLinkProvider._cwd = data;
         }
         
-        // Always update session's cwd
-        session.cwd = data;
-        
-        // Update file explorer immediately if this is the active terminal and explorer is visible
-        if (this.fileExplorer && session.id === this.activeTerminalId) {
-          console.log('[ZeamiTermManager] CWD changed for active terminal:', data);
-          if (this.fileExplorer.isVisible) {
-            this.fileExplorer.updatePath(data);
+        // Get the session from terminals map
+        const currentSession = this.terminals.get(id);
+        if (currentSession) {
+          // Always update session's cwd
+          currentSession.cwd = data;
+          
+          // Update file explorer immediately if this is the active terminal and explorer is visible
+          if (this.fileExplorer && currentSession.id === this.activeTerminalId) {
+            console.log('[ZeamiTermManager] CWD changed for active terminal:', data);
+            if (this.fileExplorer.isVisible) {
+              this.fileExplorer.updatePath(data);
+            }
           }
         }
       }
@@ -461,8 +483,36 @@ export class ZeamiTermManager {
     });
     resizeObserver.observe(wrapper);
     
-    // Session already created above
+    // Create session object
+    const session = {
+      id,
+      terminal,
+      fitAddon,
+      searchAddon,
+      shellIntegrationAddon,
+      enhancedLinkProvider,
+      webLinksAddon,
+      rendererAddon,
+      process: null,
+      title: options.name || `Terminal ${this.terminalCounter}`,
+      searchDecorations: [],
+      wrapper,
+      cwd: options.cwd || null,
+      fixedId: options.id // Store fixed ID for Terminal A/B
+    };
     
+    this.terminals.set(id, session);
+    
+    // Only set as active if it's the first terminal or explicitly requested
+    if (!this.activeTerminalId || options.activate) {
+      this.activeTerminalId = id;
+      wrapper.classList.add('active');
+    } else {
+      wrapper.classList.add('inactive');
+    }
+    
+    // Set up shell integration event handler now that session exists
+    terminal.onShellIntegrationEvent = shellIntegrationHandler;
     
     // Configure search decorations after session is created
     searchAddon.onDidChangeResults((results) => {
@@ -573,34 +623,6 @@ export class ZeamiTermManager {
       session.terminal.writeln('ZeamiTerm - Terminal API not available');
       session.terminal.writeln('Running in demo mode\r\n');
       return;
-    }
-    
-    // Create session object first
-    const session = {
-      id,
-      terminal,
-      fitAddon,
-      searchAddon,
-      shellIntegrationAddon,
-      enhancedLinkProvider,
-      webLinksAddon,
-      rendererAddon,
-      process: null,
-      title: options.name || `Terminal ${this.terminalCounter}`,
-      searchDecorations: [],
-      wrapper,
-      cwd: options.cwd || null,
-      fixedId: options.id // Store fixed ID for Terminal A/B
-    };
-    
-    this.terminals.set(id, session);
-    
-    // Only set as active if it's the first terminal or explicitly requested
-    if (!this.activeTerminalId || options.activate) {
-      this.activeTerminalId = id;
-      wrapper.classList.add('active');
-    } else {
-      wrapper.classList.add('inactive');
     }
     
     try {

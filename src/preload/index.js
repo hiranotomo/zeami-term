@@ -182,10 +182,6 @@ contextBridge.exposeInMainWorld('zeamiAPI', {
     ipcRenderer.on('zeami:pattern', (event, data) => callback(data));
   },
   
-  onLogMessage: (callback) => {
-    ipcRenderer.on(IPC_CHANNELS.LOG_MESSAGE, (event, data) => callback(event, data));
-  },
-  
   onActionSuggested: (callback) => {
     ipcRenderer.removeAllListeners('zeami:action');
     ipcRenderer.on('zeami:action', (event, data) => callback(data));

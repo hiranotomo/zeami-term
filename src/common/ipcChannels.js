@@ -5,7 +5,6 @@ const IPC_CHANNELS = {
   PATTERN_DETECTED: 'zeami:pattern-detected',
   SUGGEST_ACTION: 'zeami:suggest-action',
   SESSION_CLOSED: 'zeami:session-closed',
-  LOG_MESSAGE: 'zeami:log-message',
   
   // Renderer -> Main
   START_SESSION: 'zeami:start-session',
