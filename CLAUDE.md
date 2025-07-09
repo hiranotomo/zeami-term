@@ -1,5 +1,27 @@
 # ZeamiTerm - AI開発アシスタント用ガイドライン
 
+## 🚨 重要：ドキュメント参照について
+
+**Claude Codeは必ず以下の新しいドキュメント構造を優先的に参照してください：**
+
+### 📚 最優先参照ドキュメント（2025-01月作成）
+
+1. **[docs/README.md](docs/README.md)** - 全ドキュメントのインデックス
+2. **[docs/architecture/overview.md](docs/architecture/overview.md)** - システム全体の設計とClaude Code最適化フォーマット
+3. **[docs/features/paste-handling.md](docs/features/paste-handling.md)** - Claude Code対応の特殊なペースト処理
+4. **[docs/troubleshooting/common-issues.md](docs/troubleshooting/common-issues.md)** - 症状別トラブルシューティング
+5. **[docs/api/](docs/api/)** - 全API・IPCチャンネルリファレンス
+
+### 💡 効率的な開発のために
+
+- **🤖 Claude Code最適化フォーマット**: 全ドキュメントに実装済み
+- **📍 マーク**: 特に重要なセクションを示す
+- **ファイルパスと行番号**: `src/main/index.js:123` 形式で具体的な場所を示す
+- **クイックナビゲーション**: 各ドキュメントの冒頭に配置
+- **トラブルシューティング表**: 症状→原因→解決方法の形式
+
+古いドキュメント（2025-06月以前）は`docs_old/`に移動されています。最新の実装状態を反映した上記のドキュメントを参照してください。
+
 ## プロジェクト概要
 
 ZeamiTermは、Claude Codeとの対話を強化するElectronベースのターミナルエミュレータです。
@@ -185,6 +207,7 @@ npm run lint
 
 ## 更新履歴
 
+- 2025-01-09: ドキュメント全面再構築完了、Claude Code最適化フォーマット導入
 - 2025-06-27: Phase 2完了 - xterm.jsフォーク統合、選択透明度問題の根本解決、ソースコード分析実施
 - 2025-06-26: 包括的改善記録の作成、無限ループ問題の修正、パフォーマンス最適化
 - 2025-06-25: プロジェクト初期化、基本構造の定義、基本機能の実装完了

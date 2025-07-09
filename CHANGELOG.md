@@ -2,6 +2,24 @@
 
 All notable changes to ZeamiTerm will be documented in this file.
 
+## [0.1.10] - 2025-01-09
+
+### Fixed
+- Fixed auto-updater release notes display issues with HTML tags
+- Fixed truncation of long release notes in update dialog
+- Added proper HTML entity decoding for cleaner text display
+
+### Improved
+- Added "View Details" button for long release notes (>500 characters)
+- Release notes now display in a separate window when too long
+- Better formatting and readability of update notifications
+- App icon properly configured for all platforms
+
+### Added
+- New method `stripHtmlTags()` to clean release notes content
+- New method `showReleaseNotesWindow()` for detailed release notes display
+- Proper app icons from icons directory integrated into build
+
 ## [0.1.9] - 2025-01-08
 
 ### Fixed

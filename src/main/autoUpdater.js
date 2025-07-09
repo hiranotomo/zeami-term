@@ -4,7 +4,7 @@
  */
 
 const { autoUpdater } = require('electron-updater');
-const { dialog, BrowserWindow, app } = require('electron');
+const { dialog, BrowserWindow, app, shell } = require('electron');
 const log = require('electron-log');
 
 class AutoUpdaterManager {
@@ -111,22 +111,40 @@ class AutoUpdaterManager {
       
       // Show update available dialog with release notes
       let detail = 'ダウンロードしてインストールしますか？';
+      let fullReleaseNotes = '';
+      
       if (info.releaseNotes) {
-        detail = `更新内容:\n${info.releaseNotes}\n\nダウンロードしてインストールしますか？`;
+        // Remove HTML tags and convert to plain text
+        fullReleaseNotes = this.stripHtmlTags(info.releaseNotes);
+        
+        // Truncate if too long for dialog
+        const maxLength = 500;
+        if (fullReleaseNotes.length > maxLength) {
+          detail = `更新内容:\n${fullReleaseNotes.substring(0, maxLength)}...\n\nダウンロードしてインストールしますか？`;
+        } else {
+          detail = `更新内容:\n${fullReleaseNotes}\n\nダウンロードしてインストールしますか？`;
+        }
       }
+      
+      const buttons = fullReleaseNotes.length > 500 ? 
+        ['ダウンロード', '詳細を見る', '後で'] : 
+        ['ダウンロード', '後で'];
       
       const response = dialog.showMessageBoxSync(this.mainWindow, {
         type: 'info',
         title: 'アップデートが利用可能',
         message: `新しいバージョン ${info.version} が利用可能です。現在のバージョンは ${app.getVersion()} です。`,
         detail: detail,
-        buttons: ['ダウンロード', '後で'],
+        buttons: buttons,
         defaultId: 0,
-        cancelId: 1
+        cancelId: buttons.length - 1
       });
       
       if (response === 0) {
         autoUpdater.downloadUpdate();
+      } else if (buttons.length === 3 && response === 1) {
+        // Show full release notes
+        this.showReleaseNotesWindow(info.version, fullReleaseNotes);
       }
     });
     
@@ -239,6 +257,71 @@ class AutoUpdaterManager {
         'アップデートの確認に失敗しました。\n\n' + errorDetail
       );
     });
+  }
+  
+  stripHtmlTags(html) {
+    // Remove HTML tags and decode entities
+    return html
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\n\s*\n/g, '\n') // Remove extra newlines
+      .trim();
+  }
+  
+  showReleaseNotesWindow(version, releaseNotes) {
+    const releaseWindow = new BrowserWindow({
+      width: 800,
+      height: 600,
+      title: `バージョン ${version} リリースノート`,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true
+      }
+    });
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>リリースノート</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+          }
+          h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+          }
+          pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+          }
+          .version {
+            color: #3498db;
+            font-weight: bold;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>ZeamiTerm <span class="version">v${version}</span> リリースノート</h1>
+        <pre>${releaseNotes}</pre>
+      </body>
+      </html>
+    `;
+    
+    releaseWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
   }
   
   getUpdateInfo() {

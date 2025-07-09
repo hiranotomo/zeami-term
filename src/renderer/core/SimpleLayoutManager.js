@@ -92,33 +92,6 @@ export class SimpleLayoutManager {
     } else {
       // Add to split layout
       this.updateSplitLayout();
-      
-      // CRITICAL FIX: Force refresh after initial split layout creation
-      // This ensures terminals render correctly in vertical mode from the start
-      if (this.terminals.size === 2 && (this.mode === 'split-vertical' || this.mode === 'split-horizontal')) {
-        // Both terminals are now added, force a complete refresh
-        setTimeout(() => {
-          console.log('[SimpleLayoutManager] Forcing initial refresh for split mode terminals');
-          this.resizeTerminals();
-          
-          // Additionally refresh all terminals to ensure proper rendering
-          this.terminalManager.terminals.forEach((session) => {
-            if (session.terminal && session.wrapper.offsetParent !== null) {
-              try {
-                // Force a complete refresh without clearing content
-                session.terminal.refresh(0, session.terminal.rows - 1);
-                
-                // Ensure viewport is at correct position
-                if (session.terminal.buffer && session.terminal.buffer.active) {
-                  session.terminal.scrollToBottom();
-                }
-              } catch (error) {
-                console.warn('[SimpleLayoutManager] Failed to refresh terminal:', error);
-              }
-            }
-          });
-        }, 300); // Wait for layout to fully settle
-      }
     }
   }
   
@@ -363,41 +336,6 @@ export class SimpleLayoutManager {
     
     // Trigger resize
     this.resizeTerminals();
-    
-    // CRITICAL FIX: Additional refresh after split layout is fully created
-    // This addresses the initial render corruption in vertical/horizontal split modes
-    setTimeout(() => {
-      console.log('[SimpleLayoutManager] Post-split-creation refresh');
-      
-      // Force CSS reflow to fix stacking context issues
-      this.splitContainer.style.display = 'none';
-      this.splitContainer.offsetHeight; // Force reflow
-      this.splitContainer.style.display = 'grid';
-      
-      // Force each terminal to recalculate its dimensions and refresh
-      this.terminalManager.terminals.forEach((session) => {
-        if (session.terminal && session.fitAddon) {
-          try {
-            // Ensure terminal has correct dimensions
-            const dims = session.fitAddon.proposeDimensions();
-            if (dims && dims.cols && dims.rows) {
-              if (dims.cols !== session.terminal.cols || dims.rows !== session.terminal.rows) {
-                session.terminal.resize(dims.cols, dims.rows);
-              }
-            }
-            
-            // Force complete refresh to fix any rendering issues
-            session.terminal.refresh(0, session.terminal.rows - 1);
-            
-            // Ensure cursor is visible and at correct position
-            session.terminal.focus();
-            session.terminal.scrollToBottom();
-          } catch (error) {
-            console.warn('[SimpleLayoutManager] Failed to refresh terminal in split:', error);
-          }
-        }
-      });
-    }, 400); // Allow time for DOM layout to complete
   }
   
   updateLayout() {
