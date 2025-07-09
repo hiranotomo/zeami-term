@@ -597,8 +597,43 @@ export class ZeamiTermManager {
     }
     
     try {
-      // Show welcome message
-      this.showWelcomeMessage(session.terminal);
+      // Only show animation for the first terminal
+      const isFirstTerminal = this.terminals.size === 1;
+      let animationPromise = null;
+      let outputBuffer = [];
+      let bufferingOutput = isFirstTerminal;
+      
+      // Start animation if needed
+      if (isFirstTerminal && window.StartupAnimation) {
+        const animation = new window.StartupAnimation(session.terminal);
+        animationPromise = animation.play().then(() => {
+          // Show essential info after animation
+          session.terminal.writeln('\x1b[32m✓ ZeamiTerm commands installed!\x1b[0m');
+          session.terminal.writeln('');
+          session.terminal.writeln('Available commands:');
+          session.terminal.writeln('  \x1b[33mh\x1b[0m or \x1b[33mhelp\x1b[0m  - Open interactive menu');
+          session.terminal.writeln('  \x1b[33mzm\x1b[0m or \x1b[33mmenu\x1b[0m - Open interactive menu');
+          session.terminal.writeln('  \x1b[33mmatrix\x1b[0m       - Run Matrix animation');
+          session.terminal.writeln('  \x1b[33mmatrix extreme\x1b[0m - Run high-load test');
+          session.terminal.writeln('');
+          session.terminal.writeln('Note: The \'?\' command is aliased to \'h\'');
+          
+          // Flush buffered output
+          session.bufferingOutput = false;
+          session.outputBuffer.forEach(data => session.terminal.write(data));
+          session.outputBuffer = [];
+          
+          // Show keyboard shortcuts after flushing output
+          session.terminal.writeln(`\x1b[2mzsh: command not found: 2004h\x1b[0m`);
+          session.terminal.writeln('Type \x1b[1;33mhelp\x1b[0m for available commands or \x1b[1;33m?\x1b[0m for menu.');
+          if (KeyboardShortcuts) {
+            const shortcuts = KeyboardShortcuts.getShortcuts();
+            session.terminal.writeln(`\x1b[2mKeyboard shortcuts: ${shortcuts.copy} copy, ${shortcuts.paste} paste, ${shortcuts.pasteDebugger} debug\x1b[0m`);
+            session.terminal.writeln(`\x1b[2mFor newline: ${KeyboardShortcuts.isMac() ? 'Option' : 'Alt'}+Return or Shift+Return\x1b[0m`);
+          }
+          session.terminal.writeln('');
+        });
+      }
       
       // Create PTY process
       let result;
@@ -724,6 +759,10 @@ export class ZeamiTermManager {
           }
         });
         
+        // Store buffer state on session for access in data handler
+        session.bufferingOutput = bufferingOutput;
+        session.outputBuffer = outputBuffer;
+        
         // Handle terminal data - Use global listener approach
         if (window.electronAPI) {
           // Set up global listener only once
@@ -734,11 +773,16 @@ export class ZeamiTermManager {
               console.log(`[Renderer] Received terminal data: id=${id}, length=${data ? data.length : 0}`);
               
               // Find the terminal session that matches this process ID
-              for (const [terminalId, session] of this.terminals) {
-                if (session.process && session.process.id === id) {
+              for (const [terminalId, termSession] of this.terminals) {
+                if (termSession.process && termSession.process.id === id) {
                   console.log(`[Renderer] Writing to terminal ${terminalId}: ${data ? data.substring(0, 50) : 'null'}...`);
                   if (data) {
-                    session.terminal.write(data);
+                    // Check if we're buffering output during animation
+                    if (termSession.bufferingOutput) {
+                      termSession.outputBuffer.push(data);
+                    } else {
+                      termSession.terminal.write(data);
+                    }
                   }
                   break;
                 }
@@ -749,7 +793,11 @@ export class ZeamiTermManager {
           window.zeamiAPI.onTerminalData(({ sessionId, data }) => {
             if (sessionId === session.process.sessionId && data) {
               console.log(`[Renderer] Writing to terminal via zeamiAPI`);
-              session.terminal.write(data);
+              if (session.bufferingOutput) {
+                session.outputBuffer.push(data);
+              } else {
+                session.terminal.write(data);
+              }
             }
           });
         }
@@ -785,8 +833,11 @@ export class ZeamiTermManager {
         }, 500); // Delay to ensure terminal is ready
         
         // Auto-restore last session if this is the first terminal
+        // Delay to ensure it appears after the startup animation
         if (shouldRestore) {
-          this.tryRestoreLastSession(session);
+          setTimeout(() => {
+            this.tryRestoreLastSession(session);
+          }, 100);
         }
         
         // Save session on terminal data changes
@@ -824,74 +875,36 @@ export class ZeamiTermManager {
   }
   
   async showWelcomeMessage(terminal) {
-    // Get version from main process
-    let version = '0.1.3';
-    try {
-      if (window.electronAPI && window.electronAPI.getAppVersion) {
-        version = await window.electronAPI.getAppVersion();
-      }
-    } catch (error) {
-      console.warn('[ZeamiTermManager] Failed to get app version:', error);
+    // Use the new startup animation instead
+    if (window.StartupAnimation) {
+      const animation = new window.StartupAnimation(terminal);
+      await animation.play();
+      
+      // After animation, show essential info
+      terminal.writeln('\x1b[32m✓ ZeamiTerm commands installed!\x1b[0m');
+      terminal.writeln('');
+      terminal.writeln('Available commands:');
+      terminal.writeln('  \x1b[33mh\x1b[0m or \x1b[33mhelp\x1b[0m  - Open interactive menu');
+      terminal.writeln('  \x1b[33mzm\x1b[0m or \x1b[33mmenu\x1b[0m - Open interactive menu');
+      terminal.writeln('  \x1b[33mmatrix\x1b[0m       - Run Matrix animation');
+      terminal.writeln('  \x1b[33mmatrix extreme\x1b[0m - Run high-load test');
+      terminal.writeln('');
+      terminal.writeln('Note: The \'?\' command is aliased to \'h\'');
+      terminal.writeln(`\x1b[2mzeami:~ % 2004h\x1b[0m`);
+      terminal.writeln(`\x1b[2mzsh: command not found: 2004h\x1b[0m`);
+      terminal.writeln('Type \x1b[1;33mhelp\x1b[0m for available commands or \x1b[1;33m?\x1b[0m for menu.');
+      
+      // Show OS-specific keyboard shortcuts
+      const shortcuts = KeyboardShortcuts.getShortcuts();
+      terminal.writeln(`\x1b[2mKeyboard shortcuts: ${shortcuts.copy} copy, ${shortcuts.paste} paste, ${shortcuts.pasteDebugger} debug\x1b[0m`);
+      terminal.writeln(`\x1b[2mFor newline: ${KeyboardShortcuts.isMac() ? 'Option' : 'Alt'}+Return or Shift+Return\x1b[0m`);
+      terminal.writeln('');
+    } else {
+      // Fallback to simple message if animation is not available
+      terminal.writeln('\x1b[32mZeamiTerm v0.1.11\x1b[0m');
+      terminal.writeln('Type \x1b[1;33mhelp\x1b[0m for available commands or \x1b[1;33m?\x1b[0m for menu.');
+      terminal.writeln('');
     }
-    
-    // ATARI-style retro startup animation
-    const logo = [
-      ' ______  ____   ____   _   _  _ ',
-      '|_   / |  __|  / _  | | \\/\\ |/ |',
-      ' /  /  | |_   | |_| | | |\\/\\| |',
-      '/_____||____|  \\____| |_|    |_|'
-    ];
-    
-    const lines = [
-      '',
-      '\x1b[1;32m' + '█'.repeat(40) + '\x1b[0m',
-      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
-    ];
-    
-    // Add logo lines with centering
-    logo.forEach(line => {
-      const padding = Math.floor((38 - line.length) / 2);
-      lines.push('\x1b[1;32m█\x1b[1;33m' + ' '.repeat(padding) + line + ' '.repeat(38 - padding - line.length) + '\x1b[1;32m█\x1b[0m');
-    });
-    
-    lines.push(
-      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
-      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
-      `\x1b[1;32m█\x1b[1;33m       T E R M I N A L   v.${version}` + ' '.repeat(38 - 24 - version.length) + '\x1b[1;32m█\x1b[0m',
-      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
-      '\x1b[1;32m█\x1b[2;37m    (C) 2025 TELEPORT COMPANY, LTD.' + ' '.repeat(3) + '\x1b[1;32m█\x1b[0m',
-      '\x1b[1;32m█\x1b[2;37m        ALL RIGHTS RESERVED' + ' '.repeat(11) + '\x1b[1;32m█\x1b[0m',
-      '\x1b[1;32m█' + ' '.repeat(38) + '█\x1b[0m',
-      '\x1b[1;32m' + '█'.repeat(40) + '\x1b[0m',
-      ''
-    );
-    
-    // Animate each line with a slight delay
-    lines.forEach((line, index) => {
-      setTimeout(() => {
-        terminal.writeln(line);
-        
-        // Add blinking cursor effect on the last line
-        if (index === lines.length - 1) {
-          setTimeout(() => {
-            terminal.writeln('\x1b[5;32m█\x1b[0m');
-            
-            // Clear and show the prompt after animation
-            setTimeout(() => {
-              terminal.write('\r\x1b[K'); // Clear the blinking cursor
-              terminal.writeln('Type \x1b[1;33mhelp\x1b[0m for available commands or \x1b[1;33m?\x1b[0m for menu.');
-              
-              // Show OS-specific keyboard shortcuts
-              const shortcuts = KeyboardShortcuts.getShortcuts();
-              const modKey = KeyboardShortcuts.getModifierKey();
-              terminal.writeln(`\x1b[2mKeyboard shortcuts: ${shortcuts.copy} copy, ${shortcuts.paste} paste, ${shortcuts.pasteDebugger} debug\x1b[0m`);
-              terminal.writeln(`\x1b[2mFor newline: ${KeyboardShortcuts.isMac() ? 'Option' : 'Alt'}+Return or Shift+Return\x1b[0m`);
-              terminal.writeln('');
-            }, 800);
-          }, 200);
-        }
-      }, index * 60); // 60ms delay between lines
-    });
   }
   
   // Legacy tab methods - now handled by LayoutManager
