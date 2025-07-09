@@ -2,6 +2,25 @@
 
 All notable changes to ZeamiTerm will be documented in this file.
 
+## [0.1.11] - 2025-01-09
+
+### Fixed
+- Fixed vertical split mode display issues caused by CSS position conflicts
+- Resolved WebGL canvas rendering problems in split mode
+- Fixed CSS !important declaration conflicts between terminal-fix.css and layout.css
+
+### Improved
+- Optimized resize handling with requestAnimationFrame instead of setTimeout
+- Enhanced WebGL renderer resize notifications for better performance
+- Added WebGL-specific CSS rules for split mode canvas handling
+- Improved CSS specificity to prevent layout conflicts
+
+### Technical Details
+- Removed excessive !important declarations from terminal positioning CSS
+- Added conditional CSS rules for tab mode vs split mode
+- Implemented WebGL context-aware resize handling
+- Added proper canvas max-width/height constraints for split mode
+
 ## [0.1.10] - 2025-01-09
 
 ### Fixed

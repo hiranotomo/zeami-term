@@ -216,9 +216,9 @@
 
 /* Nested terminals in panes */
 .layout-pane .terminal-wrapper {
-  width: 100% !important;
-  height: 100% !important;
-  position: relative !important;
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
 
 /* Overlay for inactive terminals */
@@ -247,13 +247,29 @@
 
 /* Override absolute positioning when in split mode */
 .layout-split-container .terminal-wrapper {
-  position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
-  bottom: auto !important;
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
   /* Fix stacking context issue in split mode */
   isolation: isolate;
+  /* Ensure proper dimensions for WebGL canvas */
+  overflow: hidden;
+}
+
+/* WebGL-specific fixes for split mode */
+.layout-split-container .xterm-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.layout-split-container canvas {
+  /* Prevent WebGL canvas from overflowing in split mode */
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 /* Fix overlay interference in split mode */

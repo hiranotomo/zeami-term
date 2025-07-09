@@ -359,16 +359,31 @@ export class SimpleLayoutManager {
   }
   
   resizeTerminals() {
-    // Use setTimeout to ensure DOM has updated
-    setTimeout(() => {
+    // Use requestAnimationFrame for better synchronization with rendering
+    requestAnimationFrame(() => {
       this.terminals.forEach((wrapper, id) => {
         if (wrapper.offsetParent !== null) { // Terminal is visible
           const session = this.terminalManager.terminals.get(id);
           if (session && session.fitAddon) {
             try {
-              session.fitAddon.fit();
-              // Force terminal refresh to fix display issues
-              if (session.terminal) {
+              // Ensure WebGL renderer is aware of size changes
+              if (session.rendererAddon && session.rendererAddon._renderer) {
+                // Force WebGL renderer to update its dimensions
+                const rect = wrapper.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                  session.fitAddon.fit();
+                  
+                  // WebGL-specific refresh
+                  if (session.terminal._core && session.terminal._core._renderService) {
+                    session.terminal._core._renderService.clear();
+                  }
+                  
+                  // Force terminal refresh
+                  session.terminal.refresh(0, session.terminal.rows - 1);
+                }
+              } else {
+                // Fallback for non-WebGL renderers
+                session.fitAddon.fit();
                 session.terminal.refresh(0, session.terminal.rows - 1);
               }
             } catch (error) {
@@ -377,7 +392,7 @@ export class SimpleLayoutManager {
           }
         }
       });
-    }, 100); // Increased delay for better stability
+    });
   }
   
   focusTerminal(id) {
