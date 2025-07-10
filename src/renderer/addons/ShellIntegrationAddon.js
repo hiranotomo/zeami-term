@@ -22,6 +22,8 @@ export class ShellIntegrationAddon {
     this._terminal = terminal;
     
     // Register OSC handlers
+    // OSC 7 - Working directory notification
+    terminal.parser.registerOscHandler(7, this._handleDirectoryChange.bind(this));
     // OSC 133 - Shell integration sequences
     terminal.parser.registerOscHandler(133, this._handlePromptSequence.bind(this));
     // OSC 633 - Custom sequences for extended data
@@ -233,6 +235,33 @@ export class ShellIntegrationAddon {
           this._currentCommand.timestamp = parseInt(value, 10);
         }
         break;
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Handle OSC 7 sequences (standard directory change notification)
+   * Format: OSC 7 ; file://hostname/path ST
+   */
+  _handleDirectoryChange(data) {
+    try {
+      // Extract path from file:// URL
+      const match = data.match(/^file:\/\/[^\/]*(.*)$/);
+      if (match) {
+        let path = decodeURIComponent(match[1]);
+        
+        // Store CWD for current command
+        if (this._currentCommand) {
+          this._currentCommand.cwd = path;
+        }
+        
+        // Emit CWD change event
+        this._emitEvent('cwdChange', path);
+        console.log('[ShellIntegrationAddon] Directory changed via OSC 7:', path);
+      }
+    } catch (error) {
+      console.error('[ShellIntegrationAddon] Error handling OSC 7:', error);
     }
     
     return true;

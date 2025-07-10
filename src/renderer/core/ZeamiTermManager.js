@@ -377,12 +377,15 @@ export class ZeamiTermManager {
           // Always update session's cwd
           currentSession.cwd = data;
           
-          // Update file explorer immediately if this is the active terminal and explorer is visible
-          if (this.fileExplorer && currentSession.id === this.activeTerminalId) {
+          // Update process cwd as well
+          if (currentSession.process) {
+            currentSession.process.cwd = data;
+          }
+          
+          // Update status bar and file explorer if this is the active terminal
+          if (currentSession.id === this.activeTerminalId) {
             console.log('[ZeamiTermManager] CWD changed for active terminal:', data);
-            if (this.fileExplorer.isVisible) {
-              this.fileExplorer.updatePath(data);
-            }
+            this.updateStatusBar(currentSession);
           }
         }
       }
@@ -1058,6 +1061,11 @@ export class ZeamiTermManager {
       `Process: ${session.process?.pid || '-'}`;
     document.getElementById('status-connection').textContent = 
       session.process ? 'Connected' : 'Disconnected';
+    
+    // Update FileExplorer if it's visible
+    if (this.fileExplorer && this.fileExplorer.isVisible && session.process?.cwd) {
+      this.fileExplorer.updatePath(session.process.cwd);
+    }
   }
   
   setupKeyboardShortcuts() {
