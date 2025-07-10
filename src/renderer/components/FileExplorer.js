@@ -350,12 +350,18 @@ export class FileExplorer {
     const activeTerminal = this.terminalManager.terminals.get(activeTerminalId);
     console.log('[FileExplorer] Active terminal:', activeTerminal);
     
-    if (activeTerminal && activeTerminal.cwd) {
-      console.log('[FileExplorer] Terminal CWD:', activeTerminal.cwd);
-      this.updatePath(activeTerminal.cwd);
+    // Try to get CWD from terminal
+    let cwd = null;
+    if (activeTerminal) {
+      cwd = activeTerminal.cwd || activeTerminal.process?.cwd;
+      console.log('[FileExplorer] Terminal CWD:', cwd);
+    }
+    
+    if (cwd) {
+      this.updatePath(cwd);
     } else {
       // Fallback to default path if no cwd
-      const defaultPath = process.env.HOME || '/Users/' + process.env.USER || '/Users/hirano';
+      const defaultPath = '/Users/hirano/develop/Zeami-1/projects/zeami-term';
       console.log('[FileExplorer] No terminal CWD, using default path:', defaultPath);
       this.updatePath(defaultPath);
     }
@@ -373,7 +379,7 @@ export class FileExplorer {
     if (!path) {
       console.warn('[FileExplorer] updatePath called with empty path');
       // Use default path as fallback
-      const defaultPath = process.env.HOME || '/Users/' + process.env.USER || '/Users/hirano';
+      const defaultPath = '/Users/hirano/develop/Zeami-1/projects/zeami-term';
       console.log('[FileExplorer] Using default path:', defaultPath);
       path = defaultPath;
     }
@@ -390,7 +396,7 @@ export class FileExplorer {
     const pathElement = document.getElementById('file-explorer-path');
     if (pathElement) {
       // Convert home directory to ~
-      const homePath = process.env.HOME || '/Users/' + process.env.USER || '/Users/hirano';
+      const homePath = '/Users/hirano';
       const displayPath = path.replace(homePath, '~');
       pathElement.textContent = displayPath;
       pathElement.title = path; // Show full path on hover
@@ -401,11 +407,11 @@ export class FileExplorer {
       const files = await this.loadDirectory(path);
       console.log('[FileExplorer] Loaded', files.length, 'files');
       this.renderTree(files, path);
+      this.showLoading(false);
     } catch (error) {
       console.error('[FileExplorer] Failed to load directory:', error);
-      this.showError('Failed to load directory: ' + error.message);
-    } finally {
       this.showLoading(false);
+      this.showError(`Failed to load directory:<br>${error.message}<br><small>${path}</small>`);
     }
   }
 
