@@ -81,8 +81,8 @@ export class FileExplorer {
       .file-explorer {
         position: fixed;
         left: 0;
-        top: 97px; /* Below titlebar (32px) + header (65px) */
-        bottom: 24px; /* Above status bar */
+        top: 65px; /* Below titlebar (32px) + border (1px) + header (32px) */
+        bottom: 0;
         width: 250px;
         background-color: #5a5a5c;
         border-right: 1px solid var(--vscode-panel-border);
@@ -92,6 +92,8 @@ export class FileExplorer {
         transition: transform 0.2s ease-out;
         z-index: 10;
         pointer-events: none;
+        /* Make sure content doesn't overlap with status bar */
+        padding-bottom: 24px;
       }
       
       .file-explorer.visible {
@@ -182,6 +184,8 @@ export class FileExplorer {
         overflow-y: auto;
         overflow-x: hidden;
         padding: 4px 0;
+        /* Ensure scrollbar doesn't overlap with content */
+        padding-right: 4px;
       }
       
       .file-explorer-item {
