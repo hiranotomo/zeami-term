@@ -81,19 +81,20 @@ export class FileExplorer {
       .file-explorer {
         position: fixed;
         left: 0;
-        top: 65px; /* Below titlebar (32px) + border (1px) + header (32px) */
-        bottom: 0;
+        /* titlebar(32px) + titlebar border(1px) + header padding(8px) + content + header padding(8px) + header border(1px) */
+        top: calc(32px + 1px + 8px + 24px + 8px + 1px); /* = 74px */
+        /* status bar height */
+        bottom: 24px;
         width: 250px;
         background-color: #5a5a5c;
-        border-right: 1px solid var(--vscode-panel-border);
+        border-right: 1px solid #464647;
         display: flex;
         flex-direction: column;
         transform: translateX(-100%);
         transition: transform 0.2s ease-out;
         z-index: 10;
         pointer-events: none;
-        /* Make sure content doesn't overlap with status bar */
-        padding-bottom: 24px;
+        overflow: hidden;
       }
       
       .file-explorer.visible {
