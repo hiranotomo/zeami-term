@@ -52,6 +52,11 @@ class PtyService extends EventEmitter {
     env.TERM_PROGRAM = 'ZeamiTerm';
     env.TERM_PROGRAM_VERSION = '0.1.0';
     
+    // Enable shell integration
+    env.ZEAMI_TERM = '1';
+    env.ZEAMI_TERM_VERSION = '0.1.0';
+    env.ZEAMI_TERM_SESSION_ID = require('crypto').randomUUID();
+    
     // Ensure PATH includes common development tool locations
     const devPaths = [
       '/usr/local/bin',
