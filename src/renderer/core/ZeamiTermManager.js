@@ -709,7 +709,7 @@ export class ZeamiTermManager {
           if (window.electronAPI) {
             // Send initial OSC 7 to sync current directory
             // Use invisible control sequence that won't show in terminal
-            const syncCommand = `\x1b]7;file://\${HOSTNAME}\${PWD}\x07`;
+            const syncCommand = `\x1b]7;file://\\${HOSTNAME}\\${PWD}\x07`;
             window.electronAPI.sendInput(session.process.id, syncCommand);
             
             // Setup automatic directory tracking for future cd commands
@@ -721,7 +721,7 @@ export class ZeamiTermManager {
               window.electronAPI.sendInput(session.process.id, setupZsh);
             } else if (shell && shell.includes('bash')) {
               // For bash: use PROMPT_COMMAND
-              const setupBash = `\nPROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\\n'}printf '\\033]7;file://%s%s\\033\\\\' \"\$HOSTNAME\" \"\$PWD\""\n`;
+              const setupBash = `\nPROMPT_COMMAND="\${PROMPT_COMMAND:+\$PROMPT_COMMAND\$'\\n'}printf '\\033]7;file://%s%s\\033\\\\' \"\\$HOSTNAME\" \"\\$PWD\""\n`;
               window.electronAPI.sendInput(session.process.id, setupBash);
             }
           }
