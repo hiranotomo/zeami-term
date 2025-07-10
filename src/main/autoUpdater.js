@@ -17,8 +17,18 @@ class AutoUpdaterManager {
     this.CHECK_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
     
     // Configure logger
-    log.transports.file.level = 'info';
+    log.transports.file.level = 'debug';
+    log.transports.file.fileName = 'zeami-updater.log';
+    log.transports.console.level = 'debug';
     autoUpdater.logger = log;
+    
+    // Log system info for debugging
+    log.info('=== ZeamiTerm Auto-Updater Started ===');
+    log.info(`App version: ${app.getVersion()}`);
+    log.info(`Electron version: ${process.versions.electron}`);
+    log.info(`Platform: ${process.platform} ${process.arch}`);
+    log.info(`App path: ${app.getAppPath()}`);
+    log.info(`Packaged: ${app.isPackaged}`);
     
     // Check if auto-update should be enabled
     this.checkIfEnabled();
@@ -91,6 +101,11 @@ class AutoUpdaterManager {
   }
   
   setupEventHandlers() {
+    // Configure timeout for large files
+    autoUpdater.requestHeaders = {
+      'Cache-Control': 'no-cache'
+    };
+    
     // Check for update available
     autoUpdater.on('checking-for-update', () => {
       log.info('Checking for update...');
@@ -141,7 +156,11 @@ class AutoUpdaterManager {
       });
       
       if (response === 0) {
-        autoUpdater.downloadUpdate();
+        log.info('User chose to download update');
+        autoUpdater.downloadUpdate().catch(err => {
+          log.error('Download failed:', err);
+          dialog.showErrorBox('ダウンロードエラー', `アップデートのダウンロードに失敗しました:\n${err.message}`);
+        });
       } else if (buttons.length === 3 && response === 1) {
         // Show full release notes
         this.showReleaseNotesWindow(info.version, fullReleaseNotes);
@@ -158,17 +177,46 @@ class AutoUpdaterManager {
     autoUpdater.on('error', (err) => {
       log.error('Update error:', err);
       this.sendStatusToWindow('update-error', err.message);
+      
+      // Show more helpful error messages
+      let errorMessage = 'アップデートエラー';
+      let errorDetail = err.message;
+      
+      if (err.message.includes('net::') || err.message.includes('ETIMEDOUT') || err.message.includes('ECONNRESET')) {
+        errorMessage = 'ネットワークエラー';
+        errorDetail = 'ダウンロード中にネットワーク接続に問題が発生しました。\n\n' +
+                     '以下をお試しください：\n' +
+                     '• インターネット接続を確認する\n' +
+                     '• しばらく待ってから再試行する\n' +
+                     '• 手動でダウンロードする（GitHubリリースページから）';
+      } else if (err.message.includes('ENOSPC')) {
+        errorMessage = 'ディスク容量不足';
+        errorDetail = 'アップデートファイルをダウンロードするための空き容量が不足しています。';
+      }
+      
+      dialog.showErrorBox(errorMessage, errorDetail);
     });
     
     // Download progress
     autoUpdater.on('download-progress', (progressObj) => {
       this.downloadProgress = progressObj.percent;
-      log.info('Download progress:', progressObj);
+      const speedInMB = (progressObj.bytesPerSecond / 1048576).toFixed(2);
+      const transferredInMB = (progressObj.transferred / 1048576).toFixed(2);
+      const totalInMB = (progressObj.total / 1048576).toFixed(2);
+      
+      log.info(`Download progress: ${progressObj.percent.toFixed(1)}% (${transferredInMB}MB / ${totalInMB}MB) at ${speedInMB}MB/s`);
       this.sendStatusToWindow('download-progress', progressObj);
       
       // Update progress in main window if visible
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
         this.mainWindow.setProgressBar(progressObj.percent / 100);
+        
+        // Show download status in window title
+        const originalTitle = this.mainWindow.getTitle();
+        if (!originalTitle.includes('%')) {
+          this.mainWindow.originalTitle = originalTitle;
+        }
+        this.mainWindow.setTitle(`${this.mainWindow.originalTitle || 'ZeamiTerm'} - ダウンロード中 ${progressObj.percent.toFixed(0)}%`);
       }
     });
     
@@ -177,9 +225,12 @@ class AutoUpdaterManager {
       log.info('Update downloaded:', info);
       this.sendStatusToWindow('update-downloaded', info);
       
-      // Clear progress bar
+      // Clear progress bar and restore title
       if (this.mainWindow && !this.mainWindow.isDestroyed()) {
         this.mainWindow.setProgressBar(-1);
+        if (this.mainWindow.originalTitle) {
+          this.mainWindow.setTitle(this.mainWindow.originalTitle);
+        }
       }
       
       const response = dialog.showMessageBoxSync(this.mainWindow, {
@@ -193,7 +244,22 @@ class AutoUpdaterManager {
       });
       
       if (response === 0) {
-        setImmediate(() => autoUpdater.quitAndInstall());
+        log.info('User chose to restart and install update');
+        try {
+          // Force quit all windows first
+          BrowserWindow.getAllWindows().forEach(window => {
+            window.removeAllListeners('close');
+            window.close();
+          });
+          
+          // Call quitAndInstall with options
+          setImmediate(() => {
+            autoUpdater.quitAndInstall(false, true);
+          });
+        } catch (err) {
+          log.error('Failed to quit and install:', err);
+          dialog.showErrorBox('インストールエラー', `アップデートのインストールに失敗しました:\n${err.message}`);
+        }
       }
     });
   }
