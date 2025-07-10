@@ -40,7 +40,7 @@ fi
 source .env
 
 # 必須環境変数の確認
-REQUIRED_VARS=("APPLE_ID" "APPLE_ID_PASSWORD" "APPLE_TEAM_ID" "GH_TOKEN")
+REQUIRED_VARS=("APPLE_ID" "APPLE_ID_PASSWORD" "APPLE_TEAM_ID")
 MISSING_VARS=()
 
 for var in "${REQUIRED_VARS[@]}"; do
@@ -48,6 +48,13 @@ for var in "${REQUIRED_VARS[@]}"; do
         MISSING_VARS+=("$var")
     fi
 done
+
+# GH_TOKENはGitHub CLIを使用する場合はオプション
+if ! command -v gh &> /dev/null; then
+    if [ -z "$GH_TOKEN" ]; then
+        MISSING_VARS+=("GH_TOKEN (or install GitHub CLI)")
+    fi
+fi
 
 if [ ${#MISSING_VARS[@]} -ne 0 ]; then
     echo -e "${RED}❌ エラー: 以下の環境変数が設定されていません:${NC}"

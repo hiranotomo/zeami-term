@@ -2,7 +2,7 @@
 
 All notable changes to ZeamiTerm will be documented in this file.
 
-## [0.2.0] - 2025-01-10
+## [0.1.16] - 2025-01-10
 
 ### 追加
 - UIカラーの統一化: ヘッダーとファイルエクスプローラーの背景色をトグルボタンと統一
