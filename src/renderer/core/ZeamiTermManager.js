@@ -183,6 +183,12 @@ export class ZeamiTermManager {
       }
     }, 500);
     
+    // Hide loading screen
+    const loading = document.getElementById('loading');
+    if (loading) {
+      loading.style.display = 'none';
+    }
+    
     // Mark initialization as complete
     this.isInitializing = false;
     console.log('[ZeamiTermManager] Initialization complete');

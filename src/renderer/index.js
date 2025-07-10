@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Show error in loading screen
     const loading = document.getElementById('loading');
     if (loading) {
-      const message = loading.querySelector('p');
+      const message = loading.querySelector('div');
       if (message) {
         message.textContent = `Initialization failed: ${error.message}`;
         message.style.color = '#ff6b6b';
