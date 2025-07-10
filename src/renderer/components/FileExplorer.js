@@ -84,7 +84,7 @@ export class FileExplorer {
         top: 97px; /* Below titlebar (32px) + header (65px) */
         bottom: 24px; /* Above status bar */
         width: 250px;
-        background-color: var(--vscode-sideBar-background);
+        background-color: #5a5a5c;
         border-right: 1px solid var(--vscode-panel-border);
         display: flex;
         flex-direction: column;
