@@ -675,7 +675,7 @@ export class ZeamiTermManager {
           rows: session.terminal.rows,
           profileId: this.selectedProfileId,
           env: options.env || {},
-          cwd: options.cwd || '/Users/hirano/develop/Zeami-1/projects/zeami-term' // Use provided cwd or project directory
+          cwd: options.cwd // Use provided cwd or let shell use its default
         });
       } else {
         result = await window.zeamiAPI.startSession({
@@ -697,6 +697,29 @@ export class ZeamiTermManager {
         
         // Update session's cwd
         session.cwd = result.cwd;
+        
+        // Enable directory tracking silently
+        setTimeout(() => {
+          if (window.electronAPI) {
+            // Send initial OSC 7 to sync current directory
+            // Use invisible control sequence that won't show in terminal
+            const syncCommand = `\x1b]7;file://\${HOSTNAME}\${PWD}\x07`;
+            window.electronAPI.sendInput(session.process.id, syncCommand);
+            
+            // Setup automatic directory tracking for future cd commands
+            // This is done silently by modifying shell behavior
+            const shell = session.process.shell;
+            if (shell && shell.includes('zsh')) {
+              // For zsh: use preexec hook
+              const setupZsh = `\nprecmd() { printf "\\033]7;file://%s%s\\033\\\\" "$HOST" "$PWD" }\n`;
+              window.electronAPI.sendInput(session.process.id, setupZsh);
+            } else if (shell && shell.includes('bash')) {
+              // For bash: use PROMPT_COMMAND
+              const setupBash = `\nPROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\\n'}printf '\\033]7;file://%s%s\\033\\\\' \"\$HOSTNAME\" \"\$PWD\""\n`;
+              window.electronAPI.sendInput(session.process.id, setupBash);
+            }
+          }
+        }, 500);
         
         // Check and prompt for shell integration
         if (false && result.shell) {  // Temporarily disabled to fix infinite loop
@@ -1053,18 +1076,21 @@ export class ZeamiTermManager {
   updateStatusBar(session) {
     if (!session) return;
     
+    // Get the current working directory
+    const cwd = session.cwd || session.process?.cwd || '-';
+    
     document.getElementById('status-shell').textContent = 
       `Shell: ${session.process?.shell || '-'}`;
     document.getElementById('status-cwd').textContent = 
-      `Directory: ${session.process?.cwd || '-'}`;
+      `Directory: ${cwd}`;
     document.getElementById('status-process').textContent = 
       `Process: ${session.process?.pid || '-'}`;
     document.getElementById('status-connection').textContent = 
       session.process ? 'Connected' : 'Disconnected';
     
     // Update FileExplorer if it's visible
-    if (this.fileExplorer && this.fileExplorer.isVisible && session.process?.cwd) {
-      this.fileExplorer.updatePath(session.process.cwd);
+    if (this.fileExplorer && this.fileExplorer.isVisible && cwd !== '-') {
+      this.fileExplorer.updatePath(cwd);
     }
   }
   
