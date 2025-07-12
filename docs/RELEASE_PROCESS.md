@@ -142,6 +142,33 @@ cd dist/mac-arm64
 zip -ry ../ZeamiTerm-VERSION-arm64-mac.zip ZeamiTerm.app
 ```
 
+### アップデート時の "ditto: Couldn't read PKZip signature" エラー
+```
+ditto: Couldn't read PKZip signature
+```
+原因: electron-builderが生成するZIPファイルが不完全な場合がある
+
+解決:
+1. **ZIPファイルを再作成**
+```bash
+cd dist/mac-arm64
+zip -ry ../ZeamiTerm-VERSION-arm64-mac.zip ZeamiTerm.app
+```
+
+2. **新しいSHA512ハッシュを計算**
+```bash
+shasum -a 512 dist/ZeamiTerm-VERSION-arm64-mac.zip | cut -d' ' -f1 | xxd -r -p | base64
+```
+
+3. **latest-mac.ymlを更新**
+   - 新しいSHA512ハッシュ
+   - 新しいファイルサイズ（バイト）
+
+4. **GitHubリリースを更新**
+```bash
+gh release upload vVERSION dist/ZeamiTerm-VERSION-arm64-mac.zip dist/latest-mac.yml --clobber
+```
+
 ## 🔄 自動アップデート
 
 リリース後、既存のユーザーは自動的にアップデート通知を受け取ります。
