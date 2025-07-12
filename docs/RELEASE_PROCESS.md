@@ -147,6 +147,44 @@ zip -ry ../ZeamiTerm-VERSION-arm64-mac.zip ZeamiTerm.app
 リリース後、既存のユーザーは自動的にアップデート通知を受け取ります。
 
 ### アップデートの仕組み
+
+**重要**: 自動アップデートが正常に機能するためには、`latest-mac.yml`ファイルをGitHubリリースにアップロードする必要があります。
+
+### latest-mac.ymlの生成と手動アップロード
+
+リリーススクリプトが`latest-mac.yml`を自動生成しない場合は、以下の手順で手動作成してください：
+
+1. **SHA512ハッシュの計算**
+```bash
+# ZIPファイルのハッシュ
+shasum -a 512 dist/ZeamiTerm-0.1.17-arm64-mac.zip | cut -d' ' -f1 | xxd -r -p | base64
+
+# DMGファイルのハッシュ
+shasum -a 512 dist/ZeamiTerm-0.1.17-arm64.dmg | cut -d' ' -f1 | xxd -r -p | base64
+```
+
+2. **latest-mac.ymlの作成**
+```yaml
+version: 0.1.17
+files:
+  - url: ZeamiTerm-0.1.17-arm64-mac.zip
+    sha512: [ZIPファイルのSHA512ハッシュ]
+    size: [ZIPファイルのサイズ（バイト）]
+  - url: ZeamiTerm-0.1.17-arm64.dmg
+    sha512: [DMGファイルのSHA512ハッシュ]
+    size: [DMGファイルのサイズ（バイト）]
+    blockMapSize: [blockmap ファイルのサイズ]
+path: ZeamiTerm-0.1.17-arm64-mac.zip
+sha512: [ZIPファイルのSHA512ハッシュ]
+releaseDate: '2025-01-12T05:30:00.000Z'
+```
+
+3. **GitHubリリースへのアップロード**
+```bash
+gh release upload v0.1.17 dist/latest-mac.yml --clobber
+```
+
+### アップデートの動作
 1. アプリケーションが起動時にGitHubリリースをチェック
 2. 新しいバージョンが見つかった場合、通知を表示
 3. ユーザーが承認すると、バックグラウンドでダウンロード
