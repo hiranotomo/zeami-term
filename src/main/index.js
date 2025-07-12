@@ -9,6 +9,7 @@ const { MonitorWindow } = require('./monitorWindow');
 const { MessageCenterWindow } = require('./messageCenterWindow');
 const { MessageCenterService } = require('./services/MessageCenterService');
 const { ShellIntegrationCleaner } = require('./shellIntegrationCleaner');
+const { WindowStateManager } = require('./windowStateManager');
 // const { PreferenceManager } = require('../features/preferences/PreferenceManager');
 
 // Get version from package.json
@@ -25,6 +26,7 @@ let terminalProcessManager;
 let monitorWindow;
 let messageCenterWindow;
 let messageCenterService;
+let windowStateManager;
 // let preferenceManager;
 const windows = new Set();
 
@@ -38,10 +40,15 @@ function createNewWindow() {
 }
 
 function createWindow(isMain = true) {
+  // Get saved window state
+  const windowState = windowStateManager.getWindowState('main');
+  
   // Create the browser window with VS Code-like appearance
   const window = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    x: windowState.x,
+    y: windowState.y,
+    width: windowState.width,
+    height: windowState.height,
     minWidth: 600,
     minHeight: 400,
     webPreferences: {
@@ -63,7 +70,9 @@ function createWindow(isMain = true) {
   
   // Show window when ready to prevent visual flash
   window.once('ready-to-show', () => {
+    windowStateManager.restoreWindowState(window, 'main');
     window.show();
+    windowStateManager.trackWindow(window, 'main');
     // Open dev tools in development - Enable for debugging
     // Disabled by default - use menu to open
     // if (process.env.NODE_ENV !== 'production') {
@@ -71,8 +80,15 @@ function createWindow(isMain = true) {
     // }
   });
 
-  // Load the index.html file
-  window.loadFile(path.join(__dirname, '../renderer/index.html'));
+  // Load the index.html file with window context
+  const windowId = window.id || Date.now();
+  const windowIndex = windows.size;
+  window.loadFile(path.join(__dirname, '../renderer/index.html'), {
+    query: {
+      windowId: windowId.toString(),
+      windowIndex: windowIndex.toString()
+    }
+  });
 
   // Handle window closed
   // Handle window close event
@@ -299,6 +315,131 @@ function setupIpcHandlers() {
     // This is handled in MonitorWindow class
   });
   
+  // Message Center handlers
+  ipcMain.on('message:request-history', () => {
+    if (messageCenterWindow) {
+      messageCenterWindow.sendHistory();
+    }
+  });
+  
+  ipcMain.on('message:clear-history', () => {
+    if (messageCenterWindow) {
+      messageCenterWindow.clearHistory();
+    }
+  });
+  
+  ipcMain.on('message:send', (event, { targetWindowId, targetTerminalId, message }) => {
+    if (messageCenterService) {
+      messageCenterService.sendToTerminal(targetWindowId, targetTerminalId, message);
+    }
+  });
+  
+  ipcMain.on('message:broadcast', (event, message) => {
+    if (messageCenterService) {
+      messageCenterService.broadcastMessage(message);
+    }
+  });
+  
+  // Command Intelligence Hub handlers
+  ipcMain.handle('command:execution-complete', async (event, executionData) => {
+    try {
+      const result = await messageCenterService.registerCommandExecution(executionData);
+      return result;
+    } catch (error) {
+      console.error('[Main] Failed to register command execution:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('command:get-executions', async (event, filters) => {
+    try {
+      const executions = messageCenterService.getCommandExecutions(filters);
+      return { success: true, data: executions };
+    } catch (error) {
+      console.error('[Main] Failed to get command executions:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('command:get-statistics', async (event, filters) => {
+    try {
+      const statistics = messageCenterService.getStatistics(filters);
+      return { success: true, data: statistics };
+    } catch (error) {
+      console.error('[Main] Failed to get statistics:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.on('command:clear-history', async () => {
+    try {
+      messageCenterService.clearCommandHistory();
+    } catch (error) {
+      console.error('[Main] Failed to clear command history:', error);
+    }
+  });
+  
+  ipcMain.handle('command:export', async (event, { data, format }) => {
+    try {
+      const { dialog, fs } = require('electron');
+      const path = require('path');
+      
+      // Show save dialog
+      const result = await dialog.showSaveDialog({
+        title: 'Export Command Data',
+        defaultPath: `command-export-${new Date().toISOString().split('T')[0]}.${format}`,
+        filters: format === 'json' 
+          ? [{ name: 'JSON', extensions: ['json'] }]
+          : [{ name: 'CSV', extensions: ['csv'] }]
+      });
+      
+      if (!result.canceled && result.filePath) {
+        let content;
+        if (format === 'json') {
+          content = JSON.stringify(data, null, 2);
+        } else {
+          // Simple CSV conversion
+          const commands = data.commands || [];
+          const headers = ['Timestamp', 'Command', 'Status', 'Duration', 'Executor', 'Terminal'];
+          const rows = commands.map(cmd => [
+            new Date(cmd.timestamp).toISOString(),
+            cmd.command.raw,
+            cmd.execution.status,
+            cmd.execution.duration || '',
+            cmd.executor.type,
+            cmd.context.terminal.label
+          ]);
+          
+          content = [headers, ...rows].map(row => 
+            row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+          ).join('\n');
+        }
+        
+        await require('fs').promises.writeFile(result.filePath, content, 'utf-8');
+        return { success: true, path: result.filePath };
+      }
+      
+      return { success: false, error: 'Cancelled' };
+    } catch (error) {
+      console.error('[Main] Failed to export command data:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // NEW: Handle real-time terminal output
+  ipcMain.handle('terminal:output', async (event, outputData) => {
+    try {
+      // Forward to Message Center window for display
+      if (messageCenterWindow) {
+        messageCenterWindow.sendTerminalOutput(outputData);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to handle terminal output:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
   // Profile management handlers
   ipcMain.handle('profiles:get', async () => {
     try {
@@ -433,6 +574,61 @@ function setupIpcHandlers() {
       return { success: true };
     } catch (error) {
       console.error('[Main] Failed to track command end:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Command Intelligence Hub handlers
+  // Remove existing handler if any
+  ipcMain.removeHandler('command:execution-complete');
+  
+  ipcMain.handle('command:execution-complete', async (event, executionData) => {
+    try {
+      console.log('[Main] Received command execution:', executionData.id);
+      const result = await messageCenterService.registerCommandExecution(executionData);
+      console.log('[Main] Command registration result:', result);
+      return result;
+    } catch (error) {
+      console.error('[Main] Failed to register command execution:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // Remove existing handlers if any
+  ipcMain.removeHandler('command:get-executions');
+  ipcMain.removeHandler('command:get-statistics');
+  ipcMain.removeHandler('command:clear-history');
+  
+  ipcMain.handle('command:get-executions', async (event, filters) => {
+    try {
+      console.log('[Main] Getting command executions with filters:', filters);
+      const executions = messageCenterService.getCommandExecutions(filters);
+      console.log('[Main] Found executions:', executions.length);
+      return { success: true, data: executions };
+    } catch (error) {
+      console.error('[Main] Failed to get command executions:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('command:get-statistics', async (event, filters) => {
+    try {
+      console.log('[Main] Getting statistics with filters:', filters);
+      const statistics = messageCenterService.getStatistics(filters);
+      console.log('[Main] Statistics:', statistics);
+      return { success: true, data: statistics };
+    } catch (error) {
+      console.error('[Main] Failed to get statistics:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  ipcMain.handle('command:clear-history', async () => {
+    try {
+      messageCenterService.clearCommandHistory();
+      return { success: true };
+    } catch (error) {
+      console.error('[Main] Failed to clear command history:', error);
       return { success: false, error: error.message };
     }
   });
@@ -874,6 +1070,11 @@ function createApplicationMenu() {
 
 // App event handlers
 app.whenReady().then(async () => {
+  // Initialize window state manager first
+  windowStateManager = new WindowStateManager();
+  global.windowStateManager = windowStateManager; // Make it globally accessible
+  console.log('[Main] WindowStateManager initialized');
+  
   // Initialize services before creating window
   ptyService = new PtyService();
   console.log('[Main] PtyService initialized');
@@ -894,12 +1095,23 @@ app.whenReady().then(async () => {
   messageCenterService.initialize(messageCenterWindow);
   console.log('[Main] Message Center initialized');
   
+  // Log the initial state (after a short delay to ensure data is loaded)
+  setTimeout(() => {
+    console.log('[Main] Initial command executions:', messageCenterService.commandExecutions.size);
+    console.log('[Main] Initial statistics:', messageCenterService.statistics);
+  }, 1000);
+  
   // Setup IPC handlers
   setupIpcHandlers();
   console.log('[Main] IPC handlers setup complete');
   
   createApplicationMenu();
   createWindow();
+  
+  // Automatically open Message Center window on startup
+  setTimeout(() => {
+    messageCenterWindow.create();
+  }, 1000);
   
   // Initialize error recorder and sync offline errors
   try {
@@ -963,6 +1175,11 @@ app.on('before-quit', (event) => {
   // Stop periodic update checks
   if (autoUpdaterManager) {
     autoUpdaterManager.stopPeriodicChecks();
+  }
+  
+  // Shutdown MessageCenterService
+  if (messageCenterService) {
+    messageCenterService.shutdown();
   }
   
   // Clean up PTY service

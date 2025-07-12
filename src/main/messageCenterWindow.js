@@ -21,11 +21,28 @@ class MessageCenterWindow {
     
     console.log('[MessageCenterWindow] Creating new Message Center window');
     
-    this.window = new BrowserWindow({
+    // Get saved window state if windowStateManager is available
+    let windowConfig = {
       width: 900,
       height: 700,
       minWidth: 600,
-      minHeight: 400,
+      minHeight: 400
+    };
+    
+    // Check if windowStateManager is available globally
+    if (global.windowStateManager) {
+      const savedState = global.windowStateManager.getWindowState('messageCenter');
+      windowConfig = {
+        ...windowConfig,
+        x: savedState.x,
+        y: savedState.y,
+        width: savedState.width,
+        height: savedState.height
+      };
+    }
+    
+    this.window = new BrowserWindow({
+      ...windowConfig,
       title: 'ZeamiTerm Message Center',
       webPreferences: {
         preload: path.join(__dirname, '../preload/messageCenter.js'),
@@ -40,7 +57,15 @@ class MessageCenterWindow {
     
     // Show window when ready
     this.window.once('ready-to-show', () => {
+      // Restore window state if manager is available
+      if (global.windowStateManager) {
+        global.windowStateManager.restoreWindowState(this.window, 'messageCenter');
+      }
       this.window.show();
+      // Track window state changes
+      if (global.windowStateManager) {
+        global.windowStateManager.trackWindow(this.window, 'messageCenter');
+      }
       // Send initial history
       this.sendHistory();
     });
@@ -78,6 +103,29 @@ class MessageCenterWindow {
     }
     
     return message;
+  }
+  
+  // Add a command execution to history
+  addCommandExecution(commandExecution) {
+    // Send to UI if window is open
+    if (this.window && !this.window.isDestroyed()) {
+      this.window.webContents.send('command:execution-added', commandExecution);
+    }
+  }
+  
+  // NEW: Send terminal output to window with proper encoding
+  sendTerminalOutput(outputData) {
+    if (this.window && !this.window.isDestroyed()) {
+      // Pass data as-is since it should already be properly encoded
+      this.window.webContents.send('terminal:output', outputData);
+    }
+  }
+  
+  // Clear command history
+  clearCommandHistory() {
+    if (this.window && !this.window.isDestroyed()) {
+      this.window.webContents.send('command:history-cleared');
+    }
   }
   
   // Register a terminal for routing
@@ -150,6 +198,7 @@ class MessageCenterWindow {
         return this.messageHistory;
     }
   }
+  
 }
 
 module.exports = { MessageCenterWindow };

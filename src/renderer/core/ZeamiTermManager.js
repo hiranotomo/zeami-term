@@ -357,9 +357,8 @@ export class ZeamiTermManager {
     terminal.loadAddon(enhancedLinkProvider);
     
     // DISABLED: Shell integration addon - may interfere with paste
-    // const shellIntegrationAddon = new ShellIntegrationAddon();
-    // terminal.loadAddon(shellIntegrationAddon);
-    const shellIntegrationAddon = null;
+    const shellIntegrationAddon = new ShellIntegrationAddon(id);
+    terminal.loadAddon(shellIntegrationAddon);
     
     // Store shell integration event handler reference to set up later
     const shellIntegrationHandler = (eventName, data) => {
@@ -709,7 +708,7 @@ export class ZeamiTermManager {
           if (window.electronAPI) {
             // Send initial OSC 7 to sync current directory
             // Use invisible control sequence that won't show in terminal
-            const syncCommand = `\x1b]7;file://\\${HOSTNAME}\\${PWD}\x07`;
+            const syncCommand = `\x1b]7;file://\${HOSTNAME}\${PWD}\x07`;
             window.electronAPI.sendInput(session.process.id, syncCommand);
             
             // Setup automatic directory tracking for future cd commands
@@ -843,6 +842,11 @@ export class ZeamiTermManager {
                       termSession.outputBuffer.push(data);
                     } else {
                       termSession.terminal.write(data);
+                      
+                      // NEW: Forward data to ShellIntegrationAddon for Command Intelligence Hub
+                      if (termSession.shellIntegrationAddon && termSession.shellIntegrationAddon._sendTerminalOutputToHub) {
+                        termSession.shellIntegrationAddon._sendTerminalOutputToHub(data, 'output');
+                      }
                     }
                   }
                   break;
@@ -858,6 +862,11 @@ export class ZeamiTermManager {
                 session.outputBuffer.push(data);
               } else {
                 session.terminal.write(data);
+                
+                // NEW: Forward data to ShellIntegrationAddon for Command Intelligence Hub
+                if (session.shellIntegrationAddon && session.shellIntegrationAddon._sendTerminalOutputToHub) {
+                  session.shellIntegrationAddon._sendTerminalOutputToHub(data, 'output');
+                }
               }
             }
           });
@@ -1301,18 +1310,31 @@ export class ZeamiTermManager {
     }
     
     try {
+      // Ensure the window has focus before accessing clipboard
+      if (!document.hasFocus()) {
+        console.log('[ZeamiTermManager] Document not focused, focusing terminal');
+        activeTerminal.focus();
+        // Give focus a moment to take effect
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
       // Check clipboard for images
       if (navigator.clipboard && navigator.clipboard.read) {
-        const items = await navigator.clipboard.read();
-        for (const item of items) {
-          if (item.types.includes('image/png') || item.types.includes('image/jpeg')) {
-            // Found an image, send Ctrl+V to trigger Claude Code's image handling
-            console.log('[ZeamiTermManager] Image detected in clipboard, sending Ctrl+V');
-            if (activeTerminal._handleData) {
-              activeTerminal._handleData('\x16'); // Ctrl+V
+        try {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            if (item.types.includes('image/png') || item.types.includes('image/jpeg')) {
+              // Found an image, send Ctrl+V to trigger Claude Code's image handling
+              console.log('[ZeamiTermManager] Image detected in clipboard, sending Ctrl+V');
+              if (activeTerminal._handleData) {
+                activeTerminal._handleData('\x16'); // Ctrl+V
+              }
+              return;
             }
-            return;
           }
+        } catch (clipboardError) {
+          // Fall back to text paste if clipboard.read() fails
+          console.log('[ZeamiTermManager] Clipboard read failed, falling back to text paste:', clipboardError.message);
         }
       }
       
@@ -1325,6 +1347,10 @@ export class ZeamiTermManager {
       }
     } catch (error) {
       console.error('[ZeamiTermManager] Failed to handle custom paste:', error);
+      // Fallback: Use the terminal's built-in paste handler
+      if (activeTerminal.paste) {
+        activeTerminal.paste();
+      }
     }
   }
   

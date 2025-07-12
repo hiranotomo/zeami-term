@@ -1,0 +1,43 @@
+/**
+ * VS Code Codicons
+ * Minimal implementation for Message Center icons
+ */
+
+@font-face {
+  font-family: 'codicon';
+  src: url('https://microsoft.github.io/vscode-codicons/dist/codicon.ttf') format('truetype');
+}
+
+.codicon {
+  font-family: 'codicon';
+  font-size: 16px;
+  font-style: normal;
+  font-weight: normal;
+  text-decoration: none;
+  text-rendering: auto;
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Common icons */
+.codicon-bell:before { content: '\ea8f' }
+.codicon-graph:before { content: '\ebef' }
+.codicon-comment-discussion:before { content: '\ea3c' }
+.codicon-inbox:before { content: '\eb09' }
+.codicon-timeline-view:before { content: '\ec21' }
+.codicon-graph-line:before { content: '\ebf0' }
+.codicon-table:before { content: '\ebb7' }
+.codicon-filter:before { content: '\eb81' }
+.codicon-export:before { content: '\ebac' }
+.codicon-info:before { content: '\ea74' }
+.codicon-error:before { content: '\ea87' }
+.codicon-check:before { content: '\eab2' }
+.codicon-clock:before { content: '\ebb3' }
+.codicon-terminal:before { content: '\ea85' }
+.codicon-person:before { content: '\ea67' }
+.codicon-tag:before { content: '\ea66' }
+.codicon-debug:before { content: '\ead8' }

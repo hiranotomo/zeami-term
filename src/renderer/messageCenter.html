@@ -3,85 +3,120 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Message Center - ZeamiTerm</title>
+  <title>Command Intelligence Hub - ZeamiTerm</title>
   <link rel="stylesheet" href="./styles/messageCenter.css">
+  <link rel="stylesheet" href="./styles/vscode-codicons.css">
+  <link rel="stylesheet" href="./components/CommandIntelligence/command-intelligence.css">
 </head>
 <body>
   <div class="message-center">
     <!-- Header -->
     <div class="header">
       <div class="title-section">
-        <h2>Message Center</h2>
-        <span class="message-count" id="message-count">0 messages</span>
+        <h2>Command Intelligence Hub</h2>
+        <span class="status-info" id="status-info">
+          <span id="command-count">0 commands</span>
+          <span class="separator">•</span>
+          <span id="message-count">0 messages</span>
+        </span>
       </div>
       <div class="actions">
+        <button class="action-btn" id="refresh-data" title="データを更新">
+          <i class="codicon codicon-refresh"></i>
+        </button>
         <button class="action-btn" id="clear-history" title="履歴をクリア">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-          </svg>
+          <i class="codicon codicon-clear-all"></i>
+        </button>
+        <button class="action-btn" id="settings" title="設定">
+          <i class="codicon codicon-settings-gear"></i>
         </button>
       </div>
     </div>
     
-    <!-- Filter tabs -->
-    <div class="filter-tabs">
-      <button class="filter-tab active" data-filter="all">
-        <span class="tab-icon">📋</span>
-        すべて
+    <!-- Main tabs for different views -->
+    <div class="main-tabs">
+      <button class="main-tab active" data-view="intelligence">
+        <i class="codicon codicon-graph"></i>
+        Command Intelligence
       </button>
-      <button class="filter-tab" data-filter="notifications">
-        <span class="tab-icon">🔔</span>
-        通知
-      </button>
-      <button class="filter-tab" data-filter="messages">
-        <span class="tab-icon">💬</span>
-        メッセージ
-      </button>
-      <button class="filter-tab" data-filter="errors">
-        <span class="tab-icon">⚠️</span>
-        エラー
+      <button class="main-tab" data-view="messages">
+        <i class="codicon codicon-comment-discussion"></i>
+        Messages
       </button>
     </div>
     
-    <!-- Message list -->
-    <div class="message-list-container">
-      <div class="message-list" id="message-list">
-        <!-- Messages will be dynamically added here -->
-      </div>
+    <!-- Intelligence View Container -->
+    <div id="intelligence-view" class="view-container active">
+      <!-- Command Intelligence Hub will be mounted here -->
+      <div id="command-intelligence-root"></div>
     </div>
     
-    <!-- Message composer -->
-    <div class="message-composer">
-      <div class="composer-header">
-        <label for="target-selector">送信先:</label>
-        <select id="target-selector">
-          <option value="">ターミナルを選択...</option>
-          <option value="broadcast">🌐 すべてのターミナル</option>
-        </select>
-      </div>
-      <div class="composer-input">
-        <input type="text" 
-               id="message-input" 
-               placeholder="メッセージを入力..." 
-               autocomplete="off">
-        <button id="send-btn" disabled>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>
-          </svg>
-          送信
+    <!-- Messages View Container -->
+    <div id="messages-view" class="view-container" style="display: none;">
+      <!-- Filter tabs -->
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all">
+          <i class="codicon codicon-list-flat"></i>
+          すべて
         </button>
+        <button class="filter-tab" data-filter="notifications">
+          <i class="codicon codicon-bell"></i>
+          通知
+        </button>
+        <button class="filter-tab" data-filter="messages">
+          <i class="codicon codicon-comment"></i>
+          メッセージ
+        </button>
+        <button class="filter-tab" data-filter="errors">
+          <i class="codicon codicon-error"></i>
+          エラー
+        </button>
+      </div>
+      
+      <!-- Message list -->
+      <div class="message-list-container">
+        <div class="message-list" id="message-list">
+          <!-- Messages will be dynamically added here -->
+        </div>
+      </div>
+      
+      <!-- Message composer -->
+      <div class="message-composer">
+        <div class="composer-header">
+          <label for="target-selector">送信先:</label>
+          <select id="target-selector">
+            <option value="">ターミナルを選択...</option>
+            <option value="broadcast">🌐 すべてのターミナル</option>
+          </select>
+        </div>
+        <div class="composer-input">
+          <input type="text" 
+                 id="message-input" 
+                 placeholder="メッセージを入力..." 
+                 autocomplete="off">
+          <button id="send-btn" disabled>
+            <i class="codicon codicon-send"></i>
+            送信
+          </button>
+        </div>
       </div>
     </div>
   </div>
   
   <!-- Empty state -->
   <div class="empty-state" id="empty-state" style="display: none;">
-    <div class="empty-icon">📭</div>
-    <h3>メッセージがありません</h3>
-    <p>ターミナルからの通知やメッセージがここに表示されます</p>
+    <div class="empty-icon">
+      <i class="codicon codicon-inbox"></i>
+    </div>
+    <h3>データがありません</h3>
+    <p>コマンド実行やメッセージがここに表示されます</p>
   </div>
   
-  <script src="./messageCenter.js"></script>
+  <!-- React and ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Main script -->
+  <script type="module" src="./messageCenterApp.js"></script>
 </body>
 </html>

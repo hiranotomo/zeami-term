@@ -167,21 +167,18 @@ class TerminalProcessManager extends EventEmitter {
     await this.profileManager.saveProfiles();
   }
   
-  // Shell integration methods - DISABLED
+  // Shell integration methods
   
   async isShellIntegrationInstalled(shellPath) {
-    // DISABLED: Always return false
-    return false;
+    return await this.shellScriptGenerator.isIntegrationInstalled(shellPath);
   }
   
   async installShellIntegration(shellPath) {
-    // DISABLED: Do nothing
-    return { success: false, message: 'Shell integration is disabled' };
+    return await this.shellScriptGenerator.installForShell(shellPath);
   }
   
   getShellIntegrationCommand(shellPath) {
-    // DISABLED: Return empty string
-    return '';
+    return this.shellScriptGenerator.getIntegrationCommand(shellPath);
   }
 }
 

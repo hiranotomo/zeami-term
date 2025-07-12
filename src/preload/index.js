@@ -193,5 +193,22 @@ contextBridge.exposeInMainWorld('zeamiAPI', {
     ipcRenderer.removeAllListeners('terminal:exit');
     ipcRenderer.removeAllListeners('zeami:pattern');
     ipcRenderer.removeAllListeners('zeami:action');
+  },
+  
+  // Command Intelligence Hub support
+  invoke: (channel, ...args) => {
+    const validChannels = [
+      'command:execution-complete',
+      'command:get-executions',
+      'command:get-statistics',
+      'command:clear-history',
+      'terminal:output'  // NEW: For real-time terminal output
+    ];
+    
+    if (validChannels.includes(channel)) {
+      return ipcRenderer.invoke(channel, ...args);
+    }
+    console.warn(`[zeamiAPI] Invalid channel: ${channel}`);
+    return Promise.reject(new Error(`Invalid channel: ${channel}`));
   }
 });

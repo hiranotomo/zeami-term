@@ -16,6 +16,12 @@ console.log(`[ZeamiTerm] Press ${debugShortcut} to toggle paste debugger`);
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Renderer] DOM loaded, initializing ZeamiTermManager...');
   
+  // Set window context for shell integration
+  const urlParams = new URLSearchParams(window.location.search);
+  window.terminalWindowId = parseInt(urlParams.get('windowId')) || 0;
+  window.terminalWindowIndex = parseInt(urlParams.get('windowIndex')) || 0;
+  window.terminalSessionId = `session-${Date.now()}`;
+  
   try {
     await manager.init();
     console.log('[Renderer] ZeamiTermManager initialized successfully');

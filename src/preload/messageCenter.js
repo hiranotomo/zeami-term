@@ -1,33 +1,111 @@
 /**
  * Preload script for Message Center window
+ * Provides secure IPC communication between renderer and main process
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
+// Expose protected APIs to the renderer
 contextBridge.exposeInMainWorld('messageCenterAPI', {
-  // Receive messages
+  // Send messages to main process
+  send: (channel, ...args) => {
+    const validChannels = [
+      'message:request-history',
+      'message:clear-history',
+      'message:send',
+      'message:broadcast',
+      'command:clear-history',
+      'command:show-details',
+      'messageCenter:requestData'
+    ];
+    
+    if (validChannels.includes(channel)) {
+      ipcRenderer.send(channel, ...args);
+    }
+  },
+  
+  // Invoke and wait for response
+  invoke: async (channel, ...args) => {
+    const validChannels = [
+      'command:get-executions',
+      'command:get-statistics',
+      'command:export',
+      'command:execution-complete',
+      'messageCenter:sendToTerminal',
+      'messageCenter:broadcast',
+      'messageCenter:resendNotification',
+      'messageCenter:clearHistory',
+      'messageCenter:getFiltered'
+    ];
+    
+    if (validChannels.includes(channel)) {
+      return await ipcRenderer.invoke(channel, ...args);
+    }
+  },
+  
+  // Receive messages from main process
+  on: (channel, listener) => {
+    const validChannels = [
+      'message:new',
+      'history:load',
+      'history:clear',
+      'routes:update',
+      'command:execution-added',
+      'command:execution-updated',
+      'command:history-cleared',
+      'statistics-updated',
+      'terminal:output'  // NEW: For real-time terminal output
+    ];
+    
+    if (validChannels.includes(channel)) {
+      // Remove the event parameter from the listener
+      const subscription = (event, ...args) => listener(event, ...args);
+      ipcRenderer.on(channel, subscription);
+      
+      // Return a function to remove the listener
+      return () => {
+        ipcRenderer.removeListener(channel, subscription);
+      };
+    }
+  },
+  
+  // Remove listener
+  off: (channel, listener) => {
+    const validChannels = [
+      'message:new',
+      'history:load',
+      'history:clear',
+      'routes:update',
+      'command:execution-added',
+      'command:execution-updated',
+      'command:history-cleared',
+      'statistics-updated',
+      'terminal:output'  // NEW: For real-time terminal output
+    ];
+    
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeListener(channel, listener);
+    }
+  },
+  
+  // Legacy callback-based methods for compatibility
   onNewMessage: (callback) => {
     ipcRenderer.on('message:new', (event, message) => callback(message));
   },
   
-  // Receive history
   onHistoryLoad: (callback) => {
     ipcRenderer.on('history:load', (event, data) => callback(data));
   },
   
-  // Receive route updates
   onRoutesUpdate: (callback) => {
     ipcRenderer.on('routes:update', (event, routes) => callback(routes));
   },
   
-  // History cleared
   onHistoryClear: (callback) => {
     ipcRenderer.on('history:clear', () => callback());
   },
   
-  // Send message to terminal
+  // Legacy invoke methods
   sendToTerminal: async (targetWindowId, targetTerminalId, message) => {
     return await ipcRenderer.invoke('messageCenter:sendToTerminal', {
       targetWindowId,
@@ -36,27 +114,22 @@ contextBridge.exposeInMainWorld('messageCenterAPI', {
     });
   },
   
-  // Broadcast message
   broadcastMessage: async (message) => {
     return await ipcRenderer.invoke('messageCenter:broadcast', message);
   },
   
-  // Resend notification
   resendNotification: async (messageId) => {
     return await ipcRenderer.invoke('messageCenter:resendNotification', messageId);
   },
   
-  // Clear history
   clearHistory: async () => {
     return await ipcRenderer.invoke('messageCenter:clearHistory');
   },
   
-  // Get filtered messages
   getFilteredMessages: async (filter) => {
     return await ipcRenderer.invoke('messageCenter:getFiltered', filter);
   },
   
-  // Request initial data
   requestInitialData: () => {
     ipcRenderer.send('messageCenter:requestData');
   }
